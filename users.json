@@ -1,0 +1,29 @@
+{
+  "users": [
+    {
+      "id": 1,
+      "login": "admin",
+      "passwordHash": "",
+      "role": "ГС гражданских",
+      "name": "Главный администратор",
+      "active": true
+    },
+    {
+      "id": 2,
+      "login": "zgs_civil",
+      "passwordHash": "",
+      "role": "ЗГС гражданских",
+      "name": "ЗГС гражданских",
+      "active": true
+    },
+    {
+      "id": 3,
+      "login": "follower",
+      "passwordHash": "",
+      "role": "Следящий",
+      "name": "Следящий",
+      "position": "Следящий за СМИ",
+      "active": true
+    }
+  ]
+}

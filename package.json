@@ -1,0 +1,13 @@
+{
+  "name": "arizona-civil-dashboard",
+  "version": "1.0.0",
+  "description": "Панель гражданских структур Arizona RP",
+  "main": "server.js",
+  "scripts": {
+    "start": "node init-admin.js && node server.js"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "express-session": "^1.19.0"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "leaders": [
+    {
+      "id": 1,
+      "structure": "LSPD",
+      "leader": "Джон Смит",
+      "vk": "@john_smith",
+      "start_date": "2026-08-01",
+      "end_date": "2026-09-01",
+      "status": "Активен"
+    },
+    {
+      "id": 2,
+      "structure": "FBI",
+      "leader": "Алекс Родригес",
+      "vk": "@alex_fbi",
+      "start_date": "2026-08-10",
+      "end_date": "2026-09-10",
+      "status": "Активен"
+    },
+    {
+      "id": 3,
+      "structure": "Мэрия",
+      "leader": "Максим Орлов",
+      "vk": "@max_orlov",
+      "start_date": "2026-08-05",
+      "end_date": "2026-09-05",
+      "status": "Активен"
+    },
+    {
+      "id": 4,
+      "structure": "Армия",
+      "leader": "Илья Волков",
+      "vk": "@volk_az",
+      "start_date": "2026-08-15",
+      "end_date": "2026-09-15",
+      "status": "Активен"
+    }
+  ],
+  "penalties": []
+}

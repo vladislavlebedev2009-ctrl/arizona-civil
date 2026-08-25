@@ -1,0 +1,13 @@
+node_modules/
+.env
+.env.*
+arizona-data.json
+*.log
+npm-debug.log*
+.DS_Store
+*.backup
+*.before-auth.*
+public.backup/
+server.backup.js
+server.before-env.js
+package.before-admin.json
