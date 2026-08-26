@@ -4245,3 +4245,35 @@ textarea:focus {
     }
 
 }
+
+
+/* =========================================
+   VK LEADER AVATAR
+   ========================================= */
+
+.organization-leader-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.organization-leader-avatar {
+    width: 42px;
+    height: 42px;
+    min-width: 42px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+    border: 2px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.organization-leader-avatar-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 17px;
+    color: #fff;
+}
+

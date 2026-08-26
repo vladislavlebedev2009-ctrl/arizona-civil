@@ -436,6 +436,32 @@ function organizationCard(organization) {
     const leaderName =
         leader?.leader || "Не назначен";
 
+    const leaderAvatar =
+        leader?.avatar_url || "";
+
+    const leaderAvatarHTML =
+        leaderAvatar
+            ? `
+                <img
+                    src="${escapeHTML(leaderAvatar)}"
+                    alt="Аватар ${escapeHTML(leaderName)}"
+                    class="organization-leader-avatar"
+                    loading="lazy"
+                    referrerpolicy="no-referrer"
+                    onerror="this.style.display='none';"
+                >
+              `
+            : `
+                <div class="organization-leader-avatar organization-leader-avatar-placeholder">
+                    ${escapeHTML(
+                        leaderName
+                            .trim()
+                            .charAt(0)
+                            .toUpperCase() || "?"
+                    )}
+                </div>
+              `;
+
     const endDate =
         leader?.end_date || null;
 
@@ -557,9 +583,15 @@ function organizationCard(organization) {
 
                     <span>ЛИДЕР</span>
 
-                    <strong>
-                        ${escapeHTML(leaderName)}
-                    </strong>
+                    <div class="organization-leader-row">
+
+                        ${leaderAvatarHTML}
+
+                        <strong>
+                            ${escapeHTML(leaderName)}
+                        </strong>
+
+                    </div>
 
                     ${
                         leader?.vk

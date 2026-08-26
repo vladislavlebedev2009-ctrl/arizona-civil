@@ -201,6 +201,132 @@ app.use(session({
     }
 }));
 
+
+/*
+=========================================
+ VK API — PROFILE / AVATAR
+=========================================
+*/
+
+function extractVkIdentifier(value) {
+
+    if (!value) return null;
+
+    const input = String(value).trim();
+
+    if (!input) return null;
+
+    try {
+
+        const url = new URL(
+            input.startsWith("http")
+                ? input
+                : `https://${input}`
+        );
+
+        const parts = url.pathname
+            .split("/")
+            .filter(Boolean);
+
+        return parts[0] || null;
+
+    } catch {
+
+        return input
+            .replace(/^@/, "")
+            .split(/[/?#]/)[0]
+            .trim() || null;
+    }
+}
+
+
+async function getVkProfile(vkUrl) {
+
+    const identifier = extractVkIdentifier(vkUrl);
+
+    if (!identifier) {
+        return null;
+    }
+
+    if (!process.env.VK_SERVICE_TOKEN) {
+
+        console.warn(
+            "⚠️ VK_SERVICE_TOKEN отсутствует — аватар не получен"
+        );
+
+        return null;
+    }
+
+    try {
+
+        const params = new URLSearchParams({
+
+            user_ids: identifier,
+
+            fields:
+                "photo_max,photo_200,screen_name",
+
+            access_token:
+                process.env.VK_SERVICE_TOKEN,
+
+            v: "5.199"
+        });
+
+        const response = await fetch(
+            `https://api.vk.com/method/users.get?${params}`
+        );
+
+        const data = await response.json();
+
+        if (data.error) {
+
+            console.warn(
+                "⚠️ VK API:",
+                data.error.error_msg
+            );
+
+            return null;
+        }
+
+        const user =
+            data.response?.[0];
+
+        if (!user) {
+
+            console.warn(
+                "⚠️ VK пользователь не найден:",
+                identifier
+            );
+
+            return null;
+        }
+
+        return {
+
+            id: user.id,
+
+            screen_name:
+                user.screen_name ||
+                identifier,
+
+            avatar_url:
+                user.photo_max ||
+                user.photo_200 ||
+                null
+        };
+
+    } catch (error) {
+
+        console.error(
+            "⚠️ Ошибка VK API:",
+            error.message
+        );
+
+        return null;
+    }
+}
+
+
 /*
 =========================================
  AUTH
@@ -847,6 +973,22 @@ app.post(
 
             const id = Date.now();
 
+            /*
+             * VK avatar is optional.
+             * If VK is unavailable, leader creation still succeeds.
+             */
+            const vkProfile =
+                await getVkProfile(vk || "");
+
+            const avatarUrl =
+                vkProfile?.avatar_url || null;
+
+            console.log(
+                vkProfile
+                    ? `✅ VK avatar найден: ${structure} → ${vkProfile.screen_name}`
+                    : `ℹ️ VK avatar не найден: ${structure}`
+            );
+
             const result = await query(
                 `
                 INSERT INTO leaders
@@ -855,28 +997,44 @@ app.post(
                         organization,
                         name,
                         nickname,
+                        position,
                         start_date,
                         end_date,
-                        status
+                        status,
+                        avatar_url
                     )
                 VALUES
-                    ($1, $2, $3, $4, $5, $6, 'Активен')
+                    (
+                        $1,
+                        $2,
+                        $3,
+                        $4,
+                        $5,
+                        $6,
+                        $7,
+                        'Активен',
+                        $8
+                    )
                 RETURNING
                     id,
                     organization AS structure,
                     name AS leader,
                     nickname AS vk,
+                    position,
                     start_date,
                     end_date,
-                    status
+                    status,
+                    avatar_url
                 `,
                 [
                     id,
                     structure,
                     leader,
                     vk || "",
+                    "",
                     start_date,
-                    end_date
+                    end_date,
+                    avatarUrl
                 ]
             );
 
