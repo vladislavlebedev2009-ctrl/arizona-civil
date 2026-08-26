@@ -65,78 +65,95 @@ async function loadData() {
     console.log("🔄 Загрузка данных PostgreSQL...");
 
     try {
-        const test = await api("/api/leaders");
-        console.log("👑 TEST /api/leaders:", test);
-    } catch (e) {
-        console.error("❌ TEST /api/leaders ERROR:", e);
-        throw e;
-    }
 
-    try {
-
-        const [
-            leadersResult,
-            deputiesResult,
-            supervisorsResult
-        ] = await Promise.all([
-            api("/api/leaders"),
-            api("/api/deputies"),
-            api("/api/supervisors")
-        ]);
-
-        leaders = Array.isArray(leadersResult)
-            ? leadersResult
-            : [];
-
-        deputiesData = Array.isArray(deputiesResult)
-            ? deputiesResult
-            : [];
-
-        supervisorsData = Array.isArray(supervisorsResult)
-            ? supervisorsResult
-            : [];
+        const leadersResult =
+            await api("/api/leaders");
 
         console.log(
-            "✅ Данные PostgreSQL загружены:",
-            {
-                leaders: leaders.length,
-                deputies: deputiesData.length,
-                supervisors: supervisorsData.length
-            }
+            "👑 /api/leaders:",
+            leadersResult
         );
 
-        if (typeof renderLeaders === "function") {
-            renderLeaders();
-        }
-
-        if (typeof renderOrganizations === "function") {
-            renderOrganizations();
-        }
-
-        if (typeof renderSupervisors === "function") {
-            renderSupervisors();
-        }
+        leaders =
+            Array.isArray(leadersResult)
+                ? leadersResult
+                : [];
 
     } catch (error) {
 
         console.error(
-            "❌ Ошибка загрузки данных:",
+            "❌ Ошибка загрузки лидеров:",
             error
         );
 
         leaders = [];
+    }
+
+    try {
+
+        const deputiesResult =
+            await api("/api/deputies");
+
+        deputiesData =
+            Array.isArray(deputiesResult)
+                ? deputiesResult
+                : [];
+
+    } catch (error) {
+
+        console.error(
+            "❌ Ошибка загрузки заместителей:",
+            error
+        );
+
         deputiesData = [];
+    }
+
+    try {
+
+        const supervisorsResult =
+            await api("/api/supervisors");
+
+        supervisorsData =
+            Array.isArray(supervisorsResult)
+                ? supervisorsResult
+                : [];
+
+    } catch (error) {
+
+        console.error(
+            "❌ Ошибка загрузки следящих:",
+            error
+        );
+
         supervisorsData = [];
+    }
 
-        const table = $("all-leaders-table");
-
-        if (table) {
-            table.innerHTML =
-                emptyRow(
-                    8,
-                    "Не удалось загрузить лидеров"
-                );
+    console.log(
+        "✅ PostgreSQL данные:",
+        {
+            leaders: leaders.length,
+            deputies: deputiesData.length,
+            supervisors: supervisorsData.length
         }
+    );
+
+    if (
+        typeof renderLeaders === "function"
+    ) {
+        renderLeaders();
+    }
+
+    if (
+        typeof renderOrganizations === "function"
+    ) {
+        renderOrganizations();
+    }
+
+    if (
+        typeof renderSupervisors === "function"
+    ) {
+        renderSupervisors();
     }
 }
 
