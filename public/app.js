@@ -65,6 +65,14 @@ async function loadData() {
     console.log("🔄 Загрузка данных PostgreSQL...");
 
     try {
+        const test = await api("/api/leaders");
+        console.log("👑 TEST /api/leaders:", test);
+    } catch (e) {
+        console.error("❌ TEST /api/leaders ERROR:", e);
+        throw e;
+    }
+
+    try {
 
         const [
             leadersResult,
