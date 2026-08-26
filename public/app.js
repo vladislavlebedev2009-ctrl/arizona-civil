@@ -202,10 +202,13 @@ $("register-form").addEventListener("submit", async event => {
 
         const result = await api("/api/auth/register", {
             method: "POST",
-            body: {
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
                 username,
                 password
-            }
+            })
         });
 
         $("register-form").reset();
