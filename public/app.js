@@ -413,22 +413,25 @@ function organizationCard(organization) {
         organization.trim().charAt(0).toUpperCase();
 
     const leader =
-        leaders.find(
-            x => x.structure === organization
-        );
+        Array.isArray(leaders)
+            ? leaders.find(
+                x => x.structure === organization
+            )
+            : null;
 
     const organizationDeputies =
-        deputiesData.filter(
-            x => x.structure === organization
-        );
+        organization === "Конгресс"
+            ? []
+            : (
+                Array.isArray(deputiesData)
+                    ? deputiesData.filter(
+                        x => x.structure === organization
+                    )
+                    : []
+            );
 
     const leaderName =
         leader?.leader || "Не назначен";
-
-    const deputyCount =
-        organization === "Конгресс"
-            ? 0
-            : organizationDeputies.length;
 
     const endDate =
         leader?.end_date || null;
@@ -459,6 +462,52 @@ function organizationCard(organization) {
             `;
         }
     }
+
+    const deputiesHTML =
+        organization === "Конгресс"
+            ? `<div class="org-deputy-empty">—</div>`
+            : organizationDeputies.length
+                ? organizationDeputies.map(d => `
+                    <div class="org-deputy">
+
+                        <div class="org-deputy-info">
+
+                            <strong>
+                                ${escapeHTML(
+                                    d.deputy ||
+                                    d.name ||
+                                    "Без имени"
+                                )}
+                            </strong>
+
+                            ${
+                                d.vk
+                                    ? `
+                                    <a
+                                        href="${escapeHTML(d.vk)}"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        class="vk-link"
+                                    >
+                                        VK
+                                    </a>
+                                    `
+                                    : ""
+                            }
+
+                        </div>
+
+                        <button
+                            type="button"
+                            class="danger-btn org-deputy-delete"
+                            onclick="deleteDeputyFromOrganization(${Number(d.id)})"
+                        >
+                            🗑
+                        </button>
+
+                    </div>
+                `).join("")
+                : `<div class="org-deputy-empty">Не назначены</div>`;
 
     return `
         <article class="organization-card">
@@ -509,19 +558,25 @@ function organizationCard(organization) {
                         ${escapeHTML(leaderName)}
                     </strong>
 
+                    ${
+                        leader?.vk
+                            ? `
+                            <div class="organization-vk">
+                                ${vkLink(leader.vk)}
+                            </div>
+                            `
+                            : ""
+                    }
+
                 </div>
 
                 <div class="organization-info-item">
 
                     <span>ЗАМЕСТИТЕЛИ</span>
 
-                    <strong>
-                        ${
-                            organization === "Конгресс"
-                                ? "—"
-                                : deputyCount
-                        }
-                    </strong>
+                    <div class="organization-deputies">
+                        ${deputiesHTML}
+                    </div>
 
                 </div>
 
@@ -548,6 +603,45 @@ function organizationCard(organization) {
 
         </article>
     `;
+}
+
+/* Удаление заместителя непосредственно из карточки организации */
+
+async function deleteDeputyFromOrganization(id) {
+
+    if (
+        !confirm(
+            "Вы действительно хотите удалить этого заместителя?"
+        )
+    ) {
+        return;
+    }
+
+    try {
+
+        await api(
+            `/api/deputies/${Number(id)}`,
+            {
+                method: "DELETE"
+            }
+        );
+
+        await loadData();
+
+        alert("Заместитель удалён");
+
+    } catch (error) {
+
+        console.error(
+            "Ошибка удаления заместителя:",
+            error
+        );
+
+        alert(
+            error.message ||
+            "Не удалось удалить заместителя"
+        );
+    }
 }
 
 function daysWord(days) {
