@@ -62,6 +62,8 @@ async function api(url, options = {}) {
 
 async function loadData() {
 
+    console.log("🔄 Загрузка данных PostgreSQL...");
+
     try {
 
         const [
@@ -2124,15 +2126,7 @@ async function createLeader(event) {
 
         closeModal();
 
-        try {
-            leaders = await api("/api/leaders");
-        } catch (reloadError) {
-            console.error("Ошибка обновления лидеров:", reloadError);
-        }
-
-        if (typeof renderLeaders === "function") {
-            renderLeaders();
-        }
+        await loadData();
 
         if (typeof renderOrganizations === "function") {
             loadDeputies()
@@ -3255,4 +3249,31 @@ document.addEventListener("DOMContentLoaded", () => {
         );
     }
 
+});
+
+
+/* ARIZONA_LEADERS_BOOT */
+document.addEventListener("DOMContentLoaded", async () => {
+    try {
+        await loadData();
+
+        console.log(
+            "👑 Лидеры после загрузки:",
+            Array.isArray(leaders) ? leaders.length : 0
+        );
+
+        if (typeof renderLeaders === "function") {
+            renderLeaders();
+        }
+
+        if (typeof renderOrganizations === "function") {
+            renderOrganizations();
+        }
+
+    } catch (error) {
+        console.error(
+            "❌ Ошибка загрузки PostgreSQL:",
+            error
+        );
+    }
 });
