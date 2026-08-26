@@ -916,6 +916,7 @@ app.get(
                     organization AS structure,
                     name AS leader,
                     nickname AS vk,
+                    avatar_url,
                     start_date,
                     end_date,
                     status
