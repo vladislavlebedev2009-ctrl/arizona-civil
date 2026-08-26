@@ -292,8 +292,30 @@ function showApp() {
     $("profile-role").textContent =
         currentUser.role;
 
-    $("profile-avatar").textContent =
-        currentUser.username.charAt(0).toUpperCase();
+    const profileAvatar = $("profile-avatar");
+
+    if (currentUser.avatar_url) {
+        profileAvatar.innerHTML = `
+            <img
+                src="${escapeHTML(currentUser.avatar_url)}"
+                alt="${escapeHTML(currentUser.username)}"
+                style="
+                    width:100%;
+                    height:100%;
+                    border-radius:50%;
+                    object-fit:cover;
+                    display:block;
+                "
+                referrerpolicy="no-referrer"
+                onerror="this.parentElement.textContent='${escapeHTML(
+                    currentUser.username.charAt(0).toUpperCase()
+                )}';"
+            >
+        `;
+    } else {
+        profileAvatar.textContent =
+            currentUser.username.charAt(0).toUpperCase();
+    }
 
     applyPermissions();
 
@@ -444,7 +466,7 @@ function organizationCard(organization) {
             ? `
                 <img
                     src="${escapeHTML(leaderAvatar)}"
-                    alt="Аватар ${escapeHTML(leaderName)}"
+                    alt="${escapeHTML(leaderName)}"
                     class="organization-leader-avatar"
                     loading="lazy"
                     referrerpolicy="no-referrer"
@@ -497,7 +519,10 @@ function organizationCard(organization) {
             ? `<div class="org-deputy-empty">—</div>`
             : organizationDeputies.length
                 ? organizationDeputies.map(d => `
-                    <div class="org-deputy">
+                    <div
+                        class="org-deputy"
+                        onclick="event.stopPropagation()"
+                    >
 
                         <div class="org-deputy-info">
 
@@ -512,15 +537,10 @@ function organizationCard(organization) {
                             ${
                                 d.vk
                                     ? `
-                                    <a
-                                        href="${escapeHTML(d.vk)}"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        class="vk-link"
-                                    >
-                                        VK
-                                    </a>
-                                    `
+                                        <div class="org-deputy-vk">
+                                            ${vkLink(d.vk)}
+                                        </div>
+                                      `
                                     : ""
                             }
 
@@ -529,7 +549,10 @@ function organizationCard(organization) {
                         <button
                             type="button"
                             class="danger-btn org-deputy-delete"
-                            onclick="deleteDeputyFromOrganization(${Number(d.id)})"
+                            onclick="
+                                event.stopPropagation();
+                                deleteDeputyFromOrganization(${Number(d.id)})
+                            "
                         >
                             🗑
                         </button>
@@ -539,7 +562,18 @@ function organizationCard(organization) {
                 : `<div class="org-deputy-empty">Не назначены</div>`;
 
     return `
-        <article class="organization-card">
+        <article
+            class="organization-card"
+            onclick="openOrganizationDetails('${escapeHTML(organization)}')"
+            role="button"
+            tabindex="0"
+            onkeydown="
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    openOrganizationDetails('${escapeHTML(organization)}');
+                }
+            "
+        >
 
             <div class="organization-glow"></div>
 
@@ -596,10 +630,10 @@ function organizationCard(organization) {
                     ${
                         leader?.vk
                             ? `
-                            <div class="organization-vk">
-                                ${vkLink(leader.vk)}
-                            </div>
-                            `
+                                <div class="organization-vk">
+                                    ${vkLink(leader.vk)}
+                                </div>
+                              `
                             : ""
                     }
 
@@ -607,7 +641,14 @@ function organizationCard(organization) {
 
                 <div class="organization-info-item">
 
-                    <span>ЗАМЕСТИТЕЛИ</span>
+                    <span>
+                        ЗАМЕСТИТЕЛИ
+                        ${
+                            organizationDeputies.length
+                                ? `(${organizationDeputies.length})`
+                                : ""
+                        }
+                    </span>
 
                     <div class="organization-deputies">
                         ${deputiesHTML}
@@ -631,13 +672,448 @@ function organizationCard(organization) {
 
                 <span>
                     <b>ARIZONA RP</b>
-                    • Управление структурой
+                    • Нажмите для подробной информации
+                </span>
+
+                <span>
+                    →
                 </span>
 
             </div>
 
         </article>
     `;
+}
+
+
+/*
+=========================================
+ ПОДРОБНАЯ КАРТОЧКА ОРГАНИЗАЦИИ
+=========================================
+*/
+
+function openOrganizationDetails(organization) {
+
+    const leader =
+        Array.isArray(leaders)
+            ? leaders.find(
+                x => x.structure === organization
+            )
+            : null;
+
+    const organizationDeputies =
+        organization === "Конгресс"
+            ? []
+            : (
+                Array.isArray(deputiesData)
+                    ? deputiesData.filter(
+                        x => x.structure === organization
+                    )
+                    : []
+            );
+
+    const leaderName =
+        leader?.leader || "Не назначен";
+
+    const leaderAvatar =
+        leader?.avatar_url || "";
+
+    const days =
+        leader?.end_date
+            ? getDaysLeft(leader.end_date)
+            : 0;
+
+    const avatarHTML =
+        leaderAvatar
+            ? `
+                <img
+                    src="${escapeHTML(leaderAvatar)}"
+                    alt="${escapeHTML(leaderName)}"
+                    style="
+                        width:130px;
+                        height:130px;
+                        border-radius:50%;
+                        object-fit:cover;
+                        display:block;
+                        margin:0 auto 15px;
+                    "
+                    loading="lazy"
+                    referrerpolicy="no-referrer"
+                >
+              `
+            : `
+                <div style="
+                    width:130px;
+                    height:130px;
+                    border-radius:50%;
+                    display:flex;
+                    align-items:center;
+                    justify-content:center;
+                    margin:0 auto 15px;
+                    font-size:46px;
+                    font-weight:700;
+                    background:rgba(255,255,255,.08);
+                    border:1px solid rgba(255,255,255,.15);
+                ">
+                    ${escapeHTML(
+                        leaderName
+                            .trim()
+                            .charAt(0)
+                            .toUpperCase() || "?"
+                    )}
+                </div>
+              `;
+
+    const deputiesHTML =
+        organizationDeputies.length
+            ? organizationDeputies.map(d => `
+                <div style="
+                    display:flex;
+                    align-items:center;
+                    justify-content:space-between;
+                    gap:15px;
+                    padding:12px 0;
+                    border-bottom:1px solid rgba(255,255,255,.08);
+                ">
+
+                    <div>
+                        <strong>
+                            ${escapeHTML(
+                                d.deputy ||
+                                d.name ||
+                                "Без имени"
+                            )}
+                        </strong>
+
+                        ${
+                            d.position
+                                ? `
+                                    <div style="
+                                        font-size:12px;
+                                        opacity:.6;
+                                        margin-top:3px;
+                                    ">
+                                        ${escapeHTML(d.position)}
+                                    </div>
+                                  `
+                                : ""
+                        }
+                    </div>
+
+                    ${
+                        d.vk
+                            ? vkLink(d.vk)
+                            : `<span style="opacity:.5;">VK не указан</span>`
+                    }
+
+                </div>
+            `).join("")
+            : `
+                <div style="opacity:.6;">
+                    Заместители не назначены
+                </div>
+            `;
+
+
+    const canEditLeader =
+        ["ЗГС гражданских", "ГС гражданских", "Разработчик"]
+            .includes(currentUser?.role);
+
+    const canManageDeputies =
+        ["ГС гражданских", "Разработчик"]
+            .includes(currentUser?.role);
+
+    const organizationControls =
+        (canEditLeader || canManageDeputies)
+            ? `
+                <div style="
+                    margin-top:25px;
+                    padding-top:20px;
+                    border-top:1px solid rgba(255,255,255,.1);
+                ">
+
+                    <div style="
+                        font-size:12px;
+                        opacity:.65;
+                        margin-bottom:12px;
+                    ">
+                        УПРАВЛЕНИЕ ОРГАНИЗАЦИЕЙ
+                    </div>
+
+                    <div style="
+                        display:flex;
+                        flex-wrap:wrap;
+                        gap:10px;
+                    ">
+
+                        ${
+                            canEditLeader && leader
+                                ? `
+                                    <button
+                                        type="button"
+                                        class="gold-btn"
+                                        onclick="
+                                            event.stopPropagation();
+                                            closeModal();
+                                            editLeader(${Number(leader.id)})
+                                        "
+                                    >
+                                        ✏️ Изменить лидера
+                                    </button>
+                                  `
+                                : ""
+                        }
+
+                        ${
+                            canManageDeputies
+                                ? `
+                                    <button
+                                        type="button"
+                                        class="gold-btn"
+                                        onclick="
+                                            event.stopPropagation();
+                                            closeModal();
+                                            openDeputyModal('${escapeHTML(organization)}')
+                                        "
+                                    >
+                                        ➕ Добавить заместителя
+                                    </button>
+                                  `
+                                : ""
+                        }
+
+                        ${
+                            canEditLeader && leader
+                                ? `
+                                    <button
+                                        type="button"
+                                        class="danger-btn"
+                                        onclick="
+                                            event.stopPropagation();
+                                            removeLeaderFromOrganization(${Number(leader.id)}, '${escapeHTML(organization)}')
+                                        "
+                                    >
+                                        🗑️ Снять лидера
+                                    </button>
+                                  `
+                                : ""
+                        }
+
+                    </div>
+
+                </div>
+              `
+            : "";
+
+    $("modal-content").innerHTML = `
+
+        <div class="neon-modal-head">
+
+            <span>
+                ARIZONA RP • УПРАВЛЕНИЕ
+            </span>
+
+            <h2>
+                ${escapeHTML(organization)}
+            </h2>
+
+            <p>
+                Подробная информация о гражданской структуре
+            </p>
+
+        </div>
+
+        <div style="
+            text-align:center;
+            padding:10px 0 20px;
+        ">
+
+            ${avatarHTML}
+
+            <h2 style="margin:0 0 6px;">
+                ${escapeHTML(leaderName)}
+            </h2>
+
+            <div style="
+                font-size:13px;
+                opacity:.65;
+            ">
+                Лидер организации
+            </div>
+
+            ${
+                leader?.vk
+                    ? `
+                        <div style="margin-top:10px;">
+                            ${vkLink(leader.vk)}
+                        </div>
+                      `
+                    : ""
+            }
+
+        </div>
+
+        <div class="organization-info">
+
+            <div class="organization-info-item">
+
+                <span>СТАТУС</span>
+
+                <strong>
+                    ${
+                        leader && days > 0
+                            ? "Активна"
+                            : "Нет активного лидера"
+                    }
+                </strong>
+
+            </div>
+
+            <div class="organization-info-item">
+
+                <span>НАЧАЛО СРОКА</span>
+
+                <strong>
+                    ${
+                        leader?.start_date
+                            ? formatDate(leader.start_date)
+                            : "—"
+                    }
+                </strong>
+
+            </div>
+
+            <div class="organization-info-item">
+
+                <span>КОНЕЦ СРОКА</span>
+
+                <strong>
+                    ${
+                        leader?.end_date
+                            ? formatDate(leader.end_date)
+                            : "—"
+                    }
+                </strong>
+
+            </div>
+
+            <div class="organization-info-item">
+
+                <span>ОСТАЛОСЬ</span>
+
+                <strong>
+                    ${
+                        leader
+                            ? (
+                                days > 0
+                                    ? `${days} ${daysWord(days)}`
+                                    : "Срок истёк"
+                              )
+                            : "—"
+                    }
+                </strong>
+
+            </div>
+
+        </div>
+
+        <div style="
+            margin-top:25px;
+        ">
+
+            <div style="
+                font-size:12px;
+                opacity:.65;
+                margin-bottom:10px;
+                letter-spacing:.5px;
+            ">
+                ЗАМЕСТИТЕЛИ
+                ${
+                    organizationDeputies.length
+                        ? ` • ${organizationDeputies.length}`
+                        : ""
+                }
+            </div>
+
+            ${deputiesHTML}
+
+        </div>
+
+        ${organizationControls}
+
+        <div class="neon-form-actions" style="margin-top:25px;">
+
+            <button
+                type="button"
+                class="secondary-btn"
+                onclick="closeModal()"
+            >
+                Закрыть
+            </button>
+
+        </div>
+    `;
+
+    $("modal").classList.add("show");
+}
+
+
+window.editLeader = editLeader;
+
+window.openDeputyModal = openDeputyModal;
+
+window.removeLeaderFromOrganization = removeLeaderFromOrganization;
+
+window.deleteDeputyFromOrganization = deleteDeputyFromOrganization;
+
+window.closeModal = closeModal;
+
+window.openOrganizationDetails = openOrganizationDetails;
+
+async function removeLeaderFromOrganization(id, organization) {
+
+    if (!confirm(
+        `Снять текущего лидера организации «${organization}»?`
+    )) {
+        return;
+    }
+
+    try {
+
+        await api(`/api/leaders/${Number(id)}`, {
+            method: "DELETE"
+        });
+
+        closeModal();
+
+        await loadData();
+
+        if (typeof loadDeputies === "function") {
+            await loadDeputies();
+        }
+
+        if (typeof renderOrganizations === "function") {
+            renderOrganizations();
+        }
+
+        if (typeof renderLeaders === "function") {
+            renderLeaders();
+        }
+
+        alert("Лидер снят");
+
+    } catch (error) {
+
+        console.error(
+            "Ошибка снятия лидера:",
+            error
+        );
+
+        alert(
+            error.message ||
+            "Не удалось снять лидера"
+        );
+    }
 }
 
 /* Удаление заместителя непосредственно из карточки организации */
@@ -822,16 +1298,237 @@ function leaderRow(l) {
             </td>
 
             <td>
-                <button
-                    type="button"
-                    class="danger-btn leader-delete-btn"
-                    onclick="deleteLeader(${Number(l.id)})">
-                    🗑 Удалить
-                </button>
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+
+                    <button
+                        type="button"
+                        class="secondary-btn"
+                        onclick="editLeader(${Number(l.id)})">
+                        ✏️ Редактировать
+                    </button>
+
+                    <button
+                        type="button"
+                        class="danger-btn leader-delete-btn"
+                        onclick="deleteLeader(${Number(l.id)})">
+                        🗑 Удалить
+                    </button>
+
+                </div>
             </td>
 
         </tr>
     `;
+}
+
+async function editLeader(id) {
+
+    const leader = leaders.find(
+        x => Number(x.id) === Number(id)
+    );
+
+    if (!leader) {
+        alert("Лидер не найден");
+        return;
+    }
+
+    const organizationOptions =
+        organizations.map(org => `
+            <option
+                value="${escapeHTML(org)}"
+                ${org === leader.structure ? "selected" : ""}>
+                ${escapeHTML(org)}
+            </option>
+        `).join("");
+
+    $("modal-content").innerHTML = `
+
+        <div class="neon-modal-head">
+
+            <span>УПРАВЛЕНИЕ • ЛИДЕРЫ</span>
+
+            <h2>Редактирование лидера</h2>
+
+            <p>
+                Изменение данных руководителя
+            </p>
+
+        </div>
+
+        <form id="edit-leader-form">
+
+            <div class="form-group">
+
+                <label>Гражданская структура</label>
+
+                <select
+                    id="edit-leader-structure"
+                    required>
+
+                    ${organizationOptions}
+
+                </select>
+
+            </div>
+
+            <div class="form-group">
+
+                <label>Имя / Nick_Name</label>
+
+                <input
+                    id="edit-leader-name"
+                    value="${escapeHTML(leader.leader || "")}"
+                    autocomplete="off"
+                    required>
+
+            </div>
+
+            <div class="form-group">
+
+                <label>VK</label>
+
+                <input
+                    id="edit-leader-vk"
+                    value="${escapeHTML(leader.vk || "")}"
+                    placeholder="https://vk.com/username"
+                    autocomplete="off">
+
+                <small>
+                    При изменении VK аватар обновится автоматически.
+                </small>
+
+            </div>
+
+            <div class="leader-date-grid">
+
+                <div class="form-group">
+
+                    <label>Начало срока</label>
+
+                    <input
+                        id="edit-leader-start"
+                        type="date"
+                        value="${leader.start_date || ""}"
+                        required>
+
+                </div>
+
+                <div class="form-group">
+
+                    <label>Конец срока</label>
+
+                    <input
+                        id="edit-leader-end"
+                        type="date"
+                        value="${leader.end_date || ""}"
+                        required>
+
+                </div>
+
+            </div>
+
+            <div class="neon-form-actions">
+
+                <button
+                    type="button"
+                    class="secondary-btn"
+                    onclick="closeModal()">
+
+                    Отмена
+
+                </button>
+
+                <button
+                    type="submit"
+                    class="gold-btn">
+
+                    💾 Сохранить
+
+                </button>
+
+            </div>
+
+        </form>
+    `;
+
+    $("modal").classList.add("show");
+
+    $("edit-leader-form").addEventListener(
+        "submit",
+        async event => {
+
+            event.preventDefault();
+
+            const structure =
+                $("edit-leader-structure").value;
+
+            const name =
+                $("edit-leader-name").value.trim();
+
+            const vk =
+                $("edit-leader-vk").value.trim();
+
+            const start_date =
+                $("edit-leader-start").value;
+
+            const end_date =
+                $("edit-leader-end").value;
+
+            if (!structure || !name || !start_date || !end_date) {
+                alert("Заполните обязательные поля");
+                return;
+            }
+
+            if (end_date < start_date) {
+                alert(
+                    "Дата окончания не может быть раньше даты начала"
+                );
+                return;
+            }
+
+            try {
+
+                await api(`/api/leaders/${Number(id)}`, {
+
+                    method: "PUT",
+
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        structure,
+                        leader: name,
+                        vk,
+                        start_date,
+                        end_date
+                    })
+
+                });
+
+                closeModal();
+
+                await loadData();
+
+                if (typeof renderOrganizations === "function") {
+                    renderOrganizations();
+                }
+
+                if (typeof renderLeaders === "function") {
+                    renderLeaders();
+                }
+
+                alert("✅ Данные лидера обновлены");
+
+            } catch (error) {
+
+                alert(
+                    error.message ||
+                    "Не удалось изменить данные лидера"
+                );
+            }
+        }
+    );
 }
 
 function renderLeaders() {
@@ -941,7 +1638,7 @@ function renderDeputies() {
             : emptyRow(5, "Заместителей пока нет");
 }
 
-async function openDeputyModal() {
+async function openDeputyModal(selectedOrganization = '') {
 
     const availableOrganizations =
         organizations.filter(x => x !== "Конгресс");
@@ -1035,6 +1732,16 @@ async function openDeputyModal() {
     `;
 
     $("modal").classList.add("show");
+
+    if (selectedOrganization) {
+        const structureSelect =
+            $("deputy-structure");
+
+        if (structureSelect) {
+            structureSelect.value =
+                selectedOrganization;
+        }
+    }
 
     $("deputy-form").addEventListener(
         "submit",
@@ -3431,3 +4138,2346 @@ document.addEventListener("DOMContentLoaded", async () => {
         );
     }
 });
+
+
+/* =========================================================
+   ARIZONA CIVIL 2.0 — SUPERVISORS FINAL UI
+   Старые должности и данные сохраняются.
+========================================================= */
+
+let supervisorAssistantsV2 = [];
+
+async function loadSupervisorAssistantsV2() {
+    try {
+        const result =
+            await api("/api/supervisor-assistants");
+
+        supervisorAssistantsV2 =
+            Array.isArray(result)
+                ? result
+                : [];
+
+        return supervisorAssistantsV2;
+
+    } catch (error) {
+        console.error(
+            "Ошибка загрузки помощников:",
+            error
+        );
+
+        supervisorAssistantsV2 = [];
+
+        return [];
+    }
+}
+
+function supervisorAvatarV2(person) {
+
+    const avatar =
+        person?.avatar_url || "";
+
+    if (avatar) {
+        return `
+            <img
+                class="supervisor-v2-avatar-img"
+                src="${escapeHTML(avatar)}"
+                alt="${escapeHTML(person?.name || "")}"
+                onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"
+            >
+            <span class="supervisor-v2-avatar-fallback">
+                ${escapeHTML(
+                    (person?.name || "?")
+                        .charAt(0)
+                        .toUpperCase()
+                )}
+            </span>
+        `;
+    }
+
+    return `
+        <span class="supervisor-v2-avatar-fallback">
+            ${escapeHTML(
+                (person?.name || "?")
+                    .charAt(0)
+                    .toUpperCase()
+            )}
+        </span>
+    `;
+}
+
+function supervisorV2Card(s) {
+
+    const assistants =
+        supervisorAssistantsV2.filter(
+            a =>
+                Number(a.supervisor_id) ===
+                Number(s.id)
+        );
+
+    const canManage =
+        typeof level === "function" &&
+        level() >= 20;
+
+    return `
+        <article class="supervisor-v2-card">
+
+            <div class="supervisor-v2-card-glow"></div>
+
+            <div class="supervisor-v2-head">
+
+                <div class="supervisor-v2-avatar">
+                    ${supervisorAvatarV2(s)}
+                </div>
+
+                <div class="supervisor-v2-person">
+
+                    <div class="supervisor-v2-label">
+                        СЛЕДЯЩИЙ
+                    </div>
+
+                    <h3>
+                        ${escapeHTML(s.name || "—")}
+                    </h3>
+
+                    <div class="supervisor-v2-position">
+                        ${escapeHTML(
+                            s.position || "Следящий"
+                        )}
+                    </div>
+
+                </div>
+
+                <div class="supervisor-v2-status">
+                    <span></span>
+                    ACTIVE
+                </div>
+
+            </div>
+
+            ${
+                s.vk
+                    ? `
+                        <div class="supervisor-v2-vk-wrap">
+                            ${vkLink(s.vk)}
+                        </div>
+                      `
+                    : ""
+            }
+
+            <div class="supervisor-v2-divider"></div>
+
+            <div class="supervisor-v2-assistants">
+
+                <div class="supervisor-v2-assistants-title">
+
+                    <span>
+                        ПОМОЩНИКИ
+                    </span>
+
+                    <b>
+                        ${assistants.length}
+                    </b>
+
+                </div>
+
+                ${
+                    assistants.length
+                        ? assistants.map(
+                            assistant =>
+                                supervisorAssistantV2(
+                                    assistant,
+                                    canManage
+                                )
+                          ).join("")
+                        : `
+                            <div class="supervisor-v2-no-assistants">
+                                Помощники не назначены
+                            </div>
+                          `
+                }
+
+            </div>
+
+            ${
+                canManage
+                    ? `
+                        <div class="supervisor-v2-actions">
+
+                            <button
+                                class="supervisor-v2-btn"
+                                onclick="openSupervisorV2Modal(${Number(s.id)})">
+                                ✎ Изменить
+                            </button>
+
+                            <button
+                                class="supervisor-v2-btn supervisor-v2-btn-assistant"
+                                onclick="openAssistantV2Modal(${Number(s.id)})">
+                                + Помощник
+                            </button>
+
+                        </div>
+                      `
+                    : ""
+            }
+
+        </article>
+    `;
+}
+
+function supervisorAssistantV2(a, canManage) {
+
+    return `
+        <div class="supervisor-v2-assistant">
+
+            <div class="supervisor-v2-assistant-avatar">
+                ${supervisorAvatarV2(a)}
+            </div>
+
+            <div class="supervisor-v2-assistant-info">
+
+                <strong>
+                    ${escapeHTML(a.name || "—")}
+                </strong>
+
+                <span>
+                    ${escapeHTML(
+                        a.position ||
+                        "Помощник следящего"
+                    )}
+                </span>
+
+                ${
+                    a.vk
+                        ? `
+                            <small>
+                                ${vkLink(a.vk)}
+                            </small>
+                          `
+                        : ""
+                }
+
+            </div>
+
+            ${
+                canManage
+                    ? `
+                        <div class="supervisor-v2-assistant-actions">
+
+                            <button
+                                onclick="openAssistantV2EditModal(${Number(a.id)})">
+                                ✎
+                            </button>
+
+                            <button
+                                onclick="deleteAssistantV2(${Number(a.id)}, '${escapeHTML(a.name || "")}')">
+                                🗑
+                            </button>
+
+                        </div>
+                      `
+                    : ""
+            }
+
+        </div>
+    `;
+}
+
+/*
+ * Финальная версия загрузки страницы следящих.
+ * Переопределяет старые функции UI, API остаётся совместимым.
+ */
+async function loadSupervisors() {
+
+    const container =
+        $("supervisor-list");
+
+    if (!container) return;
+
+    try {
+
+        await loadSupervisorAssistantsV2();
+
+        const list =
+            await api("/api/supervisors");
+
+        if (!Array.isArray(list) || !list.length) {
+
+            container.innerHTML = `
+                <div class="supervisors-v2-empty">
+
+                    <div class="supervisor-v2-empty-icon">
+                        ◈
+                    </div>
+
+                    <h3>
+                        Следящих пока нет
+                    </h3>
+
+                    <p>
+                        Добавьте первого ответственного
+                        за гражданскую структуру.
+                    </p>
+
+                    ${
+                        level() >= 20
+                            ? `
+                                <button
+                                    class="gold-btn"
+                                    onclick="openSupervisorV2Modal()">
+                                    + Добавить следящего
+                                </button>
+                              `
+                            : ""
+                    }
+
+                </div>
+            `;
+
+            return;
+        }
+
+        container.innerHTML = `
+            <div class="supervisors-v2">
+
+                <div class="supervisors-v2-title">
+
+                    <div>
+                        <span>ARIZONA CIVIL</span>
+                        <h2>Следящие</h2>
+                    </div>
+
+                    <div class="supervisors-v2-count">
+                        ${list.length}
+                        <small>следящих</small>
+                    </div>
+
+                </div>
+
+                <div class="supervisors-v2-grid">
+
+                    ${list.map(supervisorV2Card).join("")}
+
+                </div>
+
+            </div>
+        `;
+
+    } catch (error) {
+
+        console.error(error);
+
+        container.innerHTML = `
+            <div class="supervisors-v2-empty">
+
+                <div class="supervisor-v2-empty-icon">
+                    !
+                </div>
+
+                <h3>
+                    Ошибка загрузки
+                </h3>
+
+                <p>
+                    ${escapeHTML(
+                        error.message ||
+                        "Не удалось получить список следящих"
+                    )}
+                </p>
+
+            </div>
+        `;
+    }
+}
+
+function supervisorOptionsV2(selected = null) {
+
+    const list =
+        typeof supervisorsData !== "undefined" &&
+        Array.isArray(supervisorsData)
+            ? supervisorsData
+            : [];
+
+    return list.map(s => `
+        <option
+            value="${Number(s.id)}"
+            ${
+                Number(selected) === Number(s.id)
+                    ? "selected"
+                    : ""
+            }>
+            ${escapeHTML(s.name || "Следящий")}
+            — ${escapeHTML(
+                s.position || "Следящий"
+            )}
+        </option>
+    `).join("");
+}
+
+async function openSupervisorV2Modal(id = null) {
+
+    let supervisor = null;
+
+    if (id) {
+        const list =
+            await api("/api/supervisors");
+
+        supervisor =
+            list.find(
+                s =>
+                    Number(s.id) === Number(id)
+            );
+    }
+
+    const editing =
+        Boolean(supervisor);
+
+    $("modal-content").innerHTML = `
+
+        <div class="neon-modal-header">
+
+            <span>
+                ARIZONA CIVIL 2.0
+            </span>
+
+            <h2>
+                ${
+                    editing
+                        ? "Изменение следящего"
+                        : "Новый следящий"
+                }
+            </h2>
+
+            <p>
+                Управление ответственным
+                гражданской структуры
+            </p>
+
+        </div>
+
+        <form id="supervisor-v2-form">
+
+            <div class="modern-form-group">
+
+                <label>Имя / Nick_Name</label>
+
+                <input
+                    id="supervisor-v2-name"
+                    value="${
+                        editing
+                            ? escapeHTML(
+                                supervisor.name || ""
+                              )
+                            : ""
+                    }"
+                    placeholder="Nick_Name"
+                    required>
+
+            </div>
+
+            <div class="modern-form-group">
+
+                <label>Должность</label>
+
+                <select id="supervisor-v2-position">
+
+                    ${
+                        [
+                            "ГС ГОС",
+                            "ЗГС ГОС",
+                            "ГС гражданских",
+                            "ЗГС гражданских",
+                            "Следящий",
+                            "Следящий за Правительством",
+                            "Следящий за ГЦЛ",
+                            "Следящий за СМИ",
+                            "Следящий за Страховой компанией",
+                            "Следящий за больницами",
+                            "Следящий за Прокуратурой",
+                            "Следящий за Адвокатурой",
+                            "Следящий за Конгрессом",
+                            "Следящий за Пожарным департаментом"
+                        ].map(position => `
+                            <option
+                                value="${escapeHTML(position)}"
+                                ${
+                                    editing &&
+                                    supervisor.position === position
+                                        ? "selected"
+                                        : ""
+                                }>
+                                ${escapeHTML(position)}
+                            </option>
+                        `).join("")
+                    }
+
+                </select>
+
+            </div>
+
+            <div class="modern-form-group">
+
+                <label>VK</label>
+
+                <input
+                    id="supervisor-v2-vk"
+                    value="${
+                        editing
+                            ? escapeHTML(
+                                supervisor.vk || ""
+                              )
+                            : ""
+                    }"
+                    placeholder="id123456 / screen_name">
+
+            </div>
+
+            <div class="modern-form-group">
+
+                <label>URL аватара</label>
+
+                <input
+                    id="supervisor-v2-avatar"
+                    value="${
+                        editing
+                            ? escapeHTML(
+                                supervisor.avatar_url || ""
+                              )
+                            : ""
+                    }"
+                    placeholder="https://...">
+
+            </div>
+
+            <button
+                type="submit"
+                class="gold-btn supervisor-submit">
+
+                ${
+                    editing
+                        ? "Сохранить изменения"
+                        : "Создать следящего"
+                }
+
+            </button>
+
+        </form>
+    `;
+
+    $("modal").classList.add("show");
+
+    $("supervisor-v2-form").onsubmit =
+        async event => {
+
+            event.preventDefault();
+
+            const body = {
+                name:
+                    $("supervisor-v2-name")
+                        .value.trim(),
+
+                position:
+                    $("supervisor-v2-position")
+                        .value,
+
+                vk:
+                    $("supervisor-v2-vk")
+                        .value.trim(),
+
+                avatar_url:
+                    $("supervisor-v2-avatar")
+                        .value.trim()
+            };
+
+            try {
+
+                await api(
+                    editing
+                        ? `/api/supervisors/${Number(supervisor.id)}`
+                        : "/api/supervisors",
+                    {
+                        method:
+                            editing
+                                ? "PATCH"
+                                : "POST",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        body:
+                            JSON.stringify(body)
+                    }
+                );
+
+                closeModal();
+
+                await loadSupervisors();
+
+            } catch (error) {
+
+                alert(
+                    error.message ||
+                    "Ошибка сохранения"
+                );
+            }
+        };
+}
+
+async function openAssistantV2Modal(supervisorId) {
+
+    const supervisors =
+        await api("/api/supervisors");
+
+    const supervisor =
+        supervisors.find(
+            s =>
+                Number(s.id) ===
+                Number(supervisorId)
+        );
+
+    if (!supervisor) {
+        alert("Следящий не найден");
+        return;
+    }
+
+    $("modal-content").innerHTML = `
+
+        <div class="neon-modal-header">
+
+            <span>
+                ARIZONA CIVIL 2.0
+            </span>
+
+            <h2>
+                Новый помощник
+            </h2>
+
+            <p>
+                Следящий:
+                <strong>
+                    ${escapeHTML(
+                        supervisor.name
+                    )}
+                </strong>
+            </p>
+
+        </div>
+
+        <form id="assistant-v2-form">
+
+            <div class="modern-form-group">
+
+                <label>Имя / Nick_Name</label>
+
+                <input
+                    id="assistant-v2-name"
+                    placeholder="Nick_Name"
+                    required>
+
+            </div>
+
+            <div class="modern-form-group">
+
+                <label>Должность</label>
+
+                <select id="assistant-v2-position">
+
+                    <option>
+                        Помощник следящего
+                    </option>
+
+                    <option>
+                        Старший помощник следящего
+                    </option>
+
+                </select>
+
+            </div>
+
+            <div class="modern-form-group">
+
+                <label>VK</label>
+
+                <input
+                    id="assistant-v2-vk"
+                    placeholder="id123456 / screen_name">
+
+            </div>
+
+            <div class="modern-form-group">
+
+                <label>URL аватара</label>
+
+                <input
+                    id="assistant-v2-avatar"
+                    placeholder="https://...">
+
+            </div>
+
+            <button
+                type="submit"
+                class="gold-btn supervisor-submit">
+
+                Создать помощника
+
+            </button>
+
+        </form>
+    `;
+
+    $("modal").classList.add("show");
+
+    $("assistant-v2-form").onsubmit =
+        async event => {
+
+            event.preventDefault();
+
+            try {
+
+                await api(
+                    "/api/supervisor-assistants",
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        body:
+                            JSON.stringify({
+                                supervisor_id:
+                                    Number(supervisorId),
+
+                                name:
+                                    $("assistant-v2-name")
+                                        .value.trim(),
+
+                                position:
+                                    $("assistant-v2-position")
+                                        .value,
+
+                                vk:
+                                    $("assistant-v2-vk")
+                                        .value.trim(),
+
+                                avatar_url:
+                                    $("assistant-v2-avatar")
+                                        .value.trim()
+                            })
+                    }
+                );
+
+                closeModal();
+
+                await loadSupervisors();
+
+            } catch (error) {
+
+                alert(
+                    error.message ||
+                    "Ошибка создания помощника"
+                );
+            }
+        };
+}
+
+async function openAssistantV2EditModal(id) {
+
+    const list =
+        await api(
+            "/api/supervisor-assistants"
+        );
+
+    const assistant =
+        list.find(
+            a =>
+                Number(a.id) === Number(id)
+        );
+
+    if (!assistant) {
+        alert("Помощник не найден");
+        return;
+    }
+
+    const supervisors =
+        await api("/api/supervisors");
+
+    $("modal-content").innerHTML = `
+
+        <div class="neon-modal-header">
+
+            <span>
+                ARIZONA CIVIL 2.0
+            </span>
+
+            <h2>
+                Изменить помощника
+            </h2>
+
+            <p>
+                Управление полномочиями
+            </p>
+
+        </div>
+
+        <form id="assistant-v2-edit-form">
+
+            <div class="modern-form-group">
+
+                <label>Имя / Nick_Name</label>
+
+                <input
+                    id="assistant-edit-name"
+                    value="${escapeHTML(
+                        assistant.name || ""
+                    )}"
+                    required>
+
+            </div>
+
+            <div class="modern-form-group">
+
+                <label>Следящий</label>
+
+                <select id="assistant-edit-supervisor">
+
+                    ${
+                        supervisors.map(
+                            s => `
+                                <option
+                                    value="${Number(s.id)}"
+                                    ${
+                                        Number(
+                                            assistant.supervisor_id
+                                        ) ===
+                                        Number(s.id)
+                                            ? "selected"
+                                            : ""
+                                    }>
+                                    ${escapeHTML(
+                                        s.name
+                                    )}
+                                </option>
+                            `
+                        ).join("")
+                    }
+
+                </select>
+
+            </div>
+
+            <div class="modern-form-group">
+
+                <label>Должность</label>
+
+                <select id="assistant-edit-position">
+
+                    <option
+                        ${
+                            assistant.position ===
+                            "Помощник следящего"
+                                ? "selected"
+                                : ""
+                        }>
+                        Помощник следящего
+                    </option>
+
+                    <option
+                        ${
+                            assistant.position ===
+                            "Старший помощник следящего"
+                                ? "selected"
+                                : ""
+                        }>
+                        Старший помощник следящего
+                    </option>
+
+                </select>
+
+            </div>
+
+            <div class="modern-form-group">
+
+                <label>VK</label>
+
+                <input
+                    id="assistant-edit-vk"
+                    value="${escapeHTML(
+                        assistant.vk || ""
+                    )}">
+
+            </div>
+
+            <div class="modern-form-group">
+
+                <label>URL аватара</label>
+
+                <input
+                    id="assistant-edit-avatar"
+                    value="${escapeHTML(
+                        assistant.avatar_url || ""
+                    )}">
+
+            </div>
+
+            <button
+                type="submit"
+                class="gold-btn supervisor-submit">
+
+                Сохранить изменения
+
+            </button>
+
+        </form>
+    `;
+
+    $("modal").classList.add("show");
+
+    $("assistant-v2-edit-form").onsubmit =
+        async event => {
+
+            event.preventDefault();
+
+            try {
+
+                await api(
+                    `/api/supervisor-assistants/${Number(id)}`,
+                    {
+                        method: "PATCH",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        body:
+                            JSON.stringify({
+                                name:
+                                    $("assistant-edit-name")
+                                        .value.trim(),
+
+                                supervisor_id:
+                                    Number(
+                                        $("assistant-edit-supervisor")
+                                            .value
+                                    ),
+
+                                position:
+                                    $("assistant-edit-position")
+                                        .value,
+
+                                vk:
+                                    $("assistant-edit-vk")
+                                        .value.trim(),
+
+                                avatar_url:
+                                    $("assistant-edit-avatar")
+                                        .value.trim()
+                            })
+                    }
+                );
+
+                closeModal();
+
+                await loadSupervisors();
+
+            } catch (error) {
+
+                alert(
+                    error.message ||
+                    "Ошибка сохранения"
+                );
+            }
+        };
+}
+
+async function deleteAssistantV2(id, name) {
+
+    if (
+        !confirm(
+            `Удалить помощника «${name}»?`
+        )
+    ) {
+        return;
+    }
+
+    try {
+
+        await api(
+            `/api/supervisor-assistants/${Number(id)}`,
+            {
+                method: "DELETE"
+            }
+        );
+
+        await loadSupervisors();
+
+    } catch (error) {
+
+        alert(
+            error.message ||
+            "Ошибка удаления"
+        );
+    }
+}
+
+
+
+/* =========================================================
+   ARIZONA_CIVIL_201_FRONTEND
+========================================================= */
+
+const CIVIL_ASSISTANT_ROLE =
+    "Помощник следящего";
+
+const CIVIL_ASSISTANT_POSITION =
+    "Помощник следящего за гражданской структурой";
+
+
+async function loadSupervisorsV201() {
+
+    const container =
+        $("supervisor-list");
+
+    if (!container) return;
+
+    try {
+
+        const list =
+            await api("/api/supervisors");
+
+        const supervisors =
+            list.filter(
+                x =>
+                    x.role !==
+                    CIVIL_ASSISTANT_ROLE
+            );
+
+        const assistants =
+            list.filter(
+                x =>
+                    x.role ===
+                    CIVIL_ASSISTANT_ROLE
+            );
+
+        const map =
+            new Map();
+
+        assistants.forEach(
+            assistant => {
+
+                const owner =
+                    String(
+                        assistant.supervisor_id
+                    );
+
+                if (!map.has(owner)) {
+                    map.set(owner, []);
+                }
+
+                map.get(owner).push(
+                    assistant
+                );
+            }
+        );
+
+        container.innerHTML = `
+            <div class="supervisors-v201">
+
+                ${supervisors
+                    .map(
+                        supervisor =>
+                            supervisorCardV201(
+                                supervisor,
+                                map.get(
+                                    String(supervisor.id)
+                                ) || []
+                            )
+                    )
+                    .join("")}
+
+            </div>
+        `;
+
+    } catch (error) {
+
+        container.innerHTML = `
+            <div class="supervisors-empty">
+
+                <h3>
+                    Не удалось загрузить следящих
+                </h3>
+
+                <p>
+                    ${escapeHTML(
+                        error.message || ""
+                    )}
+                </p>
+
+            </div>
+        `;
+    }
+}
+
+
+function supervisorCardV201(
+    supervisor,
+    assistants
+) {
+
+    const avatar =
+        supervisor.avatar_url
+            ? `
+                <img
+                    src="${escapeHTML(
+                        supervisor.avatar_url
+                    )}">
+              `
+            : escapeHTML(
+                (
+                    supervisor.name ||
+                    "?"
+                )
+                .charAt(0)
+                .toUpperCase()
+            );
+
+    return `
+        <article class="supervisor-v201-card">
+
+            <div class="supervisor-v201-header">
+
+                <div class="supervisor-v201-avatar">
+                    ${avatar}
+                </div>
+
+                <div class="supervisor-v201-title">
+
+                    <small>
+                        СЛЕДЯЩИЙ
+                    </small>
+
+                    <h3>
+                        ${escapeHTML(
+                            supervisor.name ||
+                            "—"
+                        )}
+                    </h3>
+
+                    <span>
+                        ${escapeHTML(
+                            supervisor.position ||
+                            "Следящий"
+                        )}
+                    </span>
+
+                </div>
+
+                <div class="supervisor-v201-status">
+                    ACTIVE
+                </div>
+
+            </div>
+
+
+            <div class="supervisor-v201-info">
+
+                <div>
+                    <small>VK</small>
+                    <span>
+                        ${escapeHTML(
+                            supervisor.vk ||
+                            "Не указан"
+                        )}
+                    </span>
+                </div>
+
+                <div>
+                    <small>ПОМОЩНИКОВ</small>
+                    <span>
+                        ${assistants.length}
+                    </span>
+                </div>
+
+            </div>
+
+
+            <section class="supervisor-v201-assistants">
+
+                <div class="supervisor-v201-section-title">
+                    ПОМОЩНИКИ
+                </div>
+
+                ${
+                    assistants.length
+                        ? assistants
+                            .map(
+                                assistant =>
+                                    assistantCardV201(
+                                        assistant
+                                    )
+                            )
+                            .join("")
+                        : `
+                            <div class="supervisor-v201-empty">
+                                Помощников нет
+                            </div>
+                          `
+                }
+
+            </section>
+
+
+            <div class="supervisor-v201-actions">
+
+                ${
+                    Number(
+                        typeof level === "function"
+                            ? level()
+                            : 0
+                    ) >= 10
+                        ? `
+                            <button
+                                onclick="openAssistantV201(
+                                    ${Number(supervisor.id)}
+                                )">
+                                ＋ Помощник
+                            </button>
+                          `
+                        : ""
+                }
+
+            </div>
+
+        </article>
+    `;
+}
+
+
+function assistantCardV201(
+    assistant
+) {
+
+    const avatar =
+        assistant.avatar_url
+            ? `
+                <img
+                    src="${escapeHTML(
+                        assistant.avatar_url
+                    )}">
+              `
+            : escapeHTML(
+                (
+                    assistant.name ||
+                    "?"
+                )
+                .charAt(0)
+                .toUpperCase()
+            );
+
+    return `
+        <div class="supervisor-v201-assistant">
+
+            <div class="supervisor-v201-assistant-avatar">
+                ${avatar}
+            </div>
+
+            <div class="supervisor-v201-assistant-data">
+
+                <strong>
+                    ${escapeHTML(
+                        assistant.name
+                    )}
+                </strong>
+
+                <span>
+                    ${CIVIL_ASSISTANT_POSITION}
+                </span>
+
+                <small>
+                    VK:
+                    ${escapeHTML(
+                        assistant.vk ||
+                        "—"
+                    )}
+                </small>
+
+            </div>
+
+            ${
+                Number(
+                    typeof level === "function"
+                        ? level()
+                        : 0
+                ) >= 10
+                    ? `
+                        <button
+                            onclick="editAssistantV201(
+                                ${Number(assistant.id)}
+                            )">
+                            ✎
+                        </button>
+
+                        <button
+                            onclick="deleteAssistantV201(
+                                ${Number(assistant.id)}
+                            )">
+                            🗑
+                        </button>
+                      `
+                    : ""
+            }
+
+        </div>
+    `;
+}
+
+
+window.openAssistantV201 =
+async function(supervisorId) {
+
+    const list =
+        await api("/api/supervisors");
+
+    const supervisor =
+        list.find(
+            x =>
+                Number(x.id) ===
+                Number(supervisorId)
+        );
+
+    if (!supervisor) {
+        alert("Следящий не найден");
+        return;
+    }
+
+    $("modal-content").innerHTML = `
+
+        <div class="neon-modal-header">
+
+            <span>
+                ARIZONA CIVIL 2.0
+            </span>
+
+            <h2>
+                Новый помощник
+            </h2>
+
+            <p>
+                Должность фиксирована
+            </p>
+
+        </div>
+
+
+        <form id="assistant-v201-form">
+
+            <div class="modern-form-group">
+
+                <label>
+                    Имя / ник
+                </label>
+
+                <input
+                    id="assistant-v201-name"
+                    placeholder="Nick_Name"
+                    required>
+
+            </div>
+
+
+            <div class="modern-form-group">
+
+                <label>
+                    VK
+                </label>
+
+                <input
+                    id="assistant-v201-vk"
+                    placeholder="https://vk.com/id...">
+
+            </div>
+
+
+            <div class="modern-form-group">
+
+                <label>
+                    Avatar URL
+                </label>
+
+                <input
+                    id="assistant-v201-avatar"
+                    placeholder="https://...">
+
+            </div>
+
+
+            <div class="modern-form-group">
+
+                <label>
+                    Следящий
+                </label>
+
+                <input
+                    value="${escapeHTML(
+                        supervisor.name
+                    )}"
+                    disabled>
+
+            </div>
+
+
+            <button
+                class="gold-btn"
+                type="submit">
+
+                Создать помощника
+
+            </button>
+
+        </form>
+    `;
+
+    $("modal").classList.add("show");
+
+
+    $("assistant-v201-form")
+        .addEventListener(
+            "submit",
+            async event => {
+
+                event.preventDefault();
+
+                try {
+
+                    await api(
+                        "/api/supervisors/assistants",
+                        {
+                            method: "POST",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+
+                            body:
+                                JSON.stringify({
+
+                                    name:
+                                        $(
+                                            "assistant-v201-name"
+                                        )
+                                        .value
+                                        .trim(),
+
+                                    vk:
+                                        $(
+                                            "assistant-v201-vk"
+                                        )
+                                        .value
+                                        .trim(),
+
+                                    avatar_url:
+                                        $(
+                                            "assistant-v201-avatar"
+                                        )
+                                        .value
+                                        .trim(),
+
+                                    supervisor_id:
+                                        Number(
+                                            supervisor.id
+                                        )
+                                })
+                        }
+                    );
+
+                    closeModal();
+
+                    await loadSupervisorsV201();
+
+                } catch (error) {
+
+                    alert(
+                        error.message ||
+                        "Ошибка создания"
+                    );
+                }
+            }
+        );
+};
+
+
+window.editAssistantV201 =
+async function(id) {
+
+    const list =
+        await api(
+            "/api/supervisors/assistants"
+        );
+
+    const assistant =
+        list.find(
+            x =>
+                Number(x.id) ===
+                Number(id)
+        );
+
+    if (!assistant) {
+        alert("Помощник не найден");
+        return;
+    }
+
+    const supervisors =
+        (await api(
+            "/api/supervisors"
+        ))
+        .filter(
+            x =>
+                x.role ===
+                "Следящий"
+        );
+
+    $("modal-content").innerHTML = `
+
+        <div class="neon-modal-header">
+
+            <span>
+                ARIZONA CIVIL 2.0
+            </span>
+
+            <h2>
+                Изменение помощника
+            </h2>
+
+        </div>
+
+
+        <form id="assistant-v201-form">
+
+            <div class="modern-form-group">
+
+                <label>
+                    Имя / ник
+                </label>
+
+                <input
+                    id="assistant-v201-name"
+                    value="${escapeHTML(
+                        assistant.name
+                    )}"
+                    required>
+
+            </div>
+
+
+            <div class="modern-form-group">
+
+                <label>
+                    VK
+                </label>
+
+                <input
+                    id="assistant-v201-vk"
+                    value="${escapeHTML(
+                        assistant.vk || ""
+                    )}">
+
+            </div>
+
+
+            <div class="modern-form-group">
+
+                <label>
+                    Avatar URL
+                </label>
+
+                <input
+                    id="assistant-v201-avatar"
+                    value="${escapeHTML(
+                        assistant.avatar_url || ""
+                    )}">
+
+            </div>
+
+
+            <div class="modern-form-group">
+
+                <label>
+                    Следящий
+                </label>
+
+                <select
+                    id="assistant-v201-owner">
+
+                    ${supervisors
+                        .map(
+                            supervisor =>
+                                `
+                                    <option
+                                        value="${Number(
+                                            supervisor.id
+                                        )}"
+                                        ${
+                                            Number(
+                                                supervisor.id
+                                            ) ===
+                                            Number(
+                                                assistant.supervisor_id
+                                            )
+                                                ? "selected"
+                                                : ""
+                                        }>
+
+                                        ${escapeHTML(
+                                            supervisor.name
+                                        )}
+
+                                    </option>
+                                `
+                        )
+                        .join("")}
+
+                </select>
+
+            </div>
+
+
+            <button
+                class="gold-btn"
+                type="submit">
+
+                Сохранить
+
+            </button>
+
+        </form>
+    `;
+
+    $("modal").classList.add("show");
+
+
+    $("assistant-v201-form")
+        .addEventListener(
+            "submit",
+            async event => {
+
+                event.preventDefault();
+
+                try {
+
+                    await api(
+                        "/api/supervisors/assistants/" +
+                        Number(id),
+                        {
+                            method: "PATCH",
+
+                            headers: {
+                                "Content-Type":
+                                    "application/json"
+                            },
+
+                            body:
+                                JSON.stringify({
+
+                                    name:
+                                        $(
+                                            "assistant-v201-name"
+                                        )
+                                        .value
+                                        .trim(),
+
+                                    vk:
+                                        $(
+                                            "assistant-v201-vk"
+                                        )
+                                        .value
+                                        .trim(),
+
+                                    avatar_url:
+                                        $(
+                                            "assistant-v201-avatar"
+                                        )
+                                        .value
+                                        .trim(),
+
+                                    supervisor_id:
+                                        Number(
+                                            $(
+                                                "assistant-v201-owner"
+                                            )
+                                            .value
+                                        )
+                                })
+                        }
+                    );
+
+                    closeModal();
+
+                    await loadSupervisorsV201();
+
+                } catch (error) {
+
+                    alert(
+                        error.message ||
+                        "Ошибка сохранения"
+                    );
+                }
+            }
+        );
+};
+
+
+window.deleteAssistantV201 =
+async function(id) {
+
+    if (
+        !confirm(
+            "Удалить помощника?"
+        )
+    ) {
+        return;
+    }
+
+    try {
+
+        await api(
+            "/api/supervisors/assistants/" +
+            Number(id),
+            {
+                method: "DELETE"
+            }
+        );
+
+        await loadSupervisorsV201();
+
+    } catch (error) {
+
+        alert(
+            error.message ||
+            "Ошибка удаления"
+        );
+    }
+};
+
+
+/*
+    Подменяем старую функцию последней
+    версией V2.0.1.
+*/
+
+window.loadSupervisors =
+    loadSupervisorsV201;
+
+try {
+    loadSupervisors =
+        loadSupervisorsV201;
+} catch (_) {}
+
+
+
+/* =========================================================
+   ARIZONA_CIVIL_ROLE_UI_FINAL
+========================================================= */
+
+const FINAL_ASSIGNABLE_ROLES = [
+    "Лидер",
+    "Заместитель"
+];
+
+async function openUserRoleManager(
+    userId
+) {
+
+    try {
+
+        const me =
+            await api(
+                "/api/auth/me"
+            );
+
+        const allowed = [
+            "Разработчик",
+            "ГС ГОС",
+            "ЗГС ГОС",
+            "ГС гражданских",
+            "ЗГС гражданских"
+        ];
+
+        if (
+            !allowed.includes(
+                me.role
+            )
+        ) {
+
+            alert(
+                "Недостаточно прав"
+            );
+
+            return;
+
+        }
+
+        const users =
+            await api(
+                "/api/users"
+            );
+
+        const user =
+            users.find(
+                x =>
+                    Number(x.id) ===
+                    Number(userId)
+            );
+
+        if (!user) {
+
+            alert(
+                "Пользователь не найден"
+            );
+
+            return;
+
+        }
+
+        $("modal-content").innerHTML = `
+
+            <div class="neon-modal-header">
+
+                <span>
+                    ARIZONA CIVIL
+                </span>
+
+                <h2>
+                    Управление ролью
+                </h2>
+
+                <p>
+                    ${escapeHTML(
+                        user.username ||
+                        user.name ||
+                        ""
+                    )}
+                </p>
+
+            </div>
+
+
+            <form
+                id="final-role-form">
+
+                <div
+                    class="modern-form-group">
+
+                    <label>
+                        Роль
+                    </label>
+
+                    <select
+                        id="final-user-role">
+
+                        ${FINAL_ASSIGNABLE_ROLES
+                            .map(
+                                role =>
+                                    `
+                                    <option
+                                        value="${escapeHTML(
+                                            role
+                                        )}"
+                                        ${
+                                            user.role === role
+                                                ? "selected"
+                                                : ""
+                                        }>
+
+                                        ${escapeHTML(
+                                            role
+                                        )}
+
+                                    </option>
+                                    `
+                            )
+                            .join("")}
+
+                    </select>
+
+                </div>
+
+
+                <button
+                    class="gold-btn"
+                    type="submit">
+
+                    Сохранить роль
+
+                </button>
+
+            </form>
+
+        `;
+
+        $("modal").classList.add(
+            "show"
+        );
+
+
+        $("final-role-form")
+            .addEventListener(
+                "submit",
+                async event => {
+
+                    event.preventDefault();
+
+                    try {
+
+                        await api(
+                            `/api/users/${Number(
+                                user.id
+                            )}/role-assignment`,
+                            {
+                                method:
+                                    "PATCH",
+
+                                headers: {
+                                    "Content-Type":
+                                        "application/json"
+                                },
+
+                                body:
+                                    JSON.stringify({
+                                        role:
+                                            $(
+                                                "final-user-role"
+                                            )
+                                            .value
+                                    })
+                            }
+                        );
+
+                        closeModal();
+
+                        if (
+                            typeof loadUsers ===
+                            "function"
+                        ) {
+                            await loadUsers();
+                        }
+
+                        alert(
+                            "Роль успешно изменена"
+                        );
+
+                    } catch (error) {
+
+                        alert(
+                            error.message ||
+                            "Ошибка изменения роли"
+                        );
+
+                    }
+
+                }
+            );
+
+    } catch (error) {
+
+        alert(
+            error.message ||
+            "Ошибка загрузки"
+        );
+
+    }
+
+}
+
+window.openUserRoleManager =
+    openUserRoleManager;
+
+
+
+/*
+=========================================================
+ ARIZONA CIVIL 3.0 — FRONTEND
+=========================================================
+*/
+
+async function loadArizonaCivilV3() {
+
+    const root =
+        document.getElementById("arizona-civil-v3");
+
+    if (!root) return;
+
+    try {
+
+        const dashboard =
+            await api("/api/v3/dashboard");
+
+        const personnel =
+            await api("/api/v3/personnel");
+
+        root.innerHTML = `
+            <div class="arizona-v3">
+
+                <div class="v3-section">
+
+                    <div class="v3-section-title">
+
+                        <div>
+                            <h2>Arizona Civil 3.0</h2>
+                            <p>
+                                Центр управления гражданскими структурами
+                            </p>
+                        </div>
+
+                        <span class="v3-role-badge">
+                            ${escapeHTML(
+                                window.currentUser?.role ||
+                                "Авторизован"
+                            )}
+                        </span>
+
+                    </div>
+
+                    <div class="v3-dashboard">
+
+                        <div class="v3-stat">
+                            <span>Всего пользователей</span>
+                            <strong>
+                                ${dashboard.users?.total || 0}
+                            </strong>
+                        </div>
+
+                        <div class="v3-stat">
+                            <span>Активных</span>
+                            <strong>
+                                ${dashboard.users?.active || 0}
+                            </strong>
+                        </div>
+
+                        <div class="v3-stat">
+                            <span>Назначений</span>
+                            <strong>
+                                ${dashboard.appointments?.count || 0}
+                            </strong>
+                        </div>
+
+                        <div class="v3-stat">
+                            <span>Организаций</span>
+                            <strong>
+                                ${dashboard.organizations?.length || 0}
+                            </strong>
+                        </div>
+
+                    </div>
+
+                </div>
+
+                <div class="v3-section">
+
+                    <div class="v3-section-title">
+                        <h2>Кадровый центр</h2>
+
+                        <button
+                            class="v3-btn primary"
+                            onclick="loadArizonaCivilV3()">
+                            Обновить
+                        </button>
+                    </div>
+
+                    <div class="v3-toolbar">
+
+                        <input
+                            id="v3-person-search"
+                            class="v3-input"
+                            placeholder="Поиск сотрудника...">
+
+                        <select
+                            id="v3-role-filter"
+                            class="v3-select">
+
+                            <option value="">
+                                Все роли
+                            </option>
+
+                            <option>Разработчик</option>
+                            <option>ГС ГОС</option>
+                            <option>ЗГС ГОС</option>
+                            <option>ГС гражданских</option>
+                            <option>ЗГС гражданских</option>
+                            <option>Следящий</option>
+                            <option>
+                                Помощник следящего за гражданской структурой
+                            </option>
+                            <option>Лидер</option>
+                            <option>Заместитель</option>
+                            <option>Пользователь</option>
+
+                        </select>
+
+                    </div>
+
+                    <div
+                        id="v3-personnel"
+                        class="v3-personnel-grid">
+
+                        ${personnel.map(v3PersonnelCard).join("")}
+
+                    </div>
+
+                </div>
+
+            </div>
+        `;
+
+        const search =
+            document.getElementById(
+                "v3-person-search"
+            );
+
+        const role =
+            document.getElementById(
+                "v3-role-filter"
+            );
+
+        async function reload() {
+
+            const params =
+                new URLSearchParams();
+
+            if (search.value.trim()) {
+                params.set(
+                    "search",
+                    search.value.trim()
+                );
+            }
+
+            if (role.value) {
+                params.set(
+                    "role",
+                    role.value
+                );
+            }
+
+            const list =
+                await api(
+                    "/api/v3/personnel?" +
+                    params.toString()
+                );
+
+            document.getElementById(
+                "v3-personnel"
+            ).innerHTML =
+                list.map(v3PersonnelCard).join("");
+        }
+
+        search.addEventListener(
+            "input",
+            reload
+        );
+
+        role.addEventListener(
+            "change",
+            reload
+        );
+
+    } catch (error) {
+
+        root.innerHTML = `
+            <div class="v3-empty">
+                Не удалось загрузить Arizona Civil 3.0
+                <br>
+                ${escapeHTML(error.message || "")}
+            </div>
+        `;
+    }
+}
+
+
+function v3PersonnelCard(user) {
+
+    const avatar =
+        user.avatar_url
+            ? `
+                <img
+                    class="v3-avatar"
+                    src="${escapeHTML(user.avatar_url)}"
+                    alt="">
+              `
+            : `
+                <div class="v3-avatar">
+                    ${escapeHTML(
+                        (user.username || "?")
+                            .charAt(0)
+                            .toUpperCase()
+                    )}
+                </div>
+              `;
+
+    return `
+        <article class="v3-person-card">
+
+            <div class="v3-person-top">
+
+                ${avatar}
+
+                <div>
+
+                    <div class="v3-person-name">
+                        ${escapeHTML(
+                            user.name ||
+                            user.username ||
+                            "—"
+                        )}
+                    </div>
+
+                    <div class="v3-person-role">
+                        ${escapeHTML(
+                            user.role || "Пользователь"
+                        )}
+                    </div>
+
+                </div>
+
+            </div>
+
+            <div class="v3-person-meta">
+
+                <div>
+                    <span>Логин</span>
+                    <strong>
+                        ${escapeHTML(
+                            user.username || "—"
+                        )}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>Организация</span>
+                    <strong>
+                        ${escapeHTML(
+                            user.organization || "—"
+                        )}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>VK</span>
+                    <strong>
+                        ${escapeHTML(
+                            user.vk || "—"
+                        )}
+                    </strong>
+                </div>
+
+                <div>
+                    <span>Статус</span>
+                    <strong>
+                        ${user.active
+                            ? "Активен"
+                            : "Неактивен"}
+                    </strong>
+                </div>
+
+            </div>
+
+            <div class="v3-actions">
+
+                <button
+                    class="v3-btn"
+                    onclick="openV3PersonnelProfile(
+                        ${Number(user.id)}
+                    )">
+                    Профиль
+                </button>
+
+            </div>
+
+        </article>
+    `;
+}
+
+
+async function openV3PersonnelProfile(id) {
+
+    try {
+
+        const data =
+            await api(
+                "/api/v3/personnel/" +
+                Number(id)
+            );
+
+        if (
+            typeof openModal === "function"
+        ) {
+
+            openModal(
+                `
+                    <div class="v3-section">
+
+                        <h2>
+                            ${escapeHTML(
+                                data.user.name ||
+                                data.user.username
+                            )}
+                        </h2>
+
+                        <p>
+                            ${escapeHTML(
+                                data.user.role
+                            )}
+                        </p>
+
+                        <hr>
+
+                        <h3>
+                            История
+                        </h3>
+
+                        ${data.history.length
+                            ? data.history.map(
+                                item => `
+                                    <div class="v3-person-meta">
+                                        <strong>
+                                            ${escapeHTML(
+                                                item.action
+                                            )}
+                                        </strong>
+                                        <span>
+                                            ${escapeHTML(
+                                                item.details || ""
+                                            )}
+                                        </span>
+                                        <span>
+                                            ${escapeHTML(
+                                                item.actor || ""
+                                            )}
+                                        </span>
+                                    </div>
+                                `
+                            ).join("")
+                            : "<p>Истории пока нет</p>"
+                        }
+
+                    </div>
+                `
+            );
+
+        } else {
+
+            alert(
+                "Профиль загружен"
+            );
+        }
+
+    } catch (error) {
+
+        alert(
+            error.message ||
+            "Ошибка загрузки профиля"
+        );
+    }
+}

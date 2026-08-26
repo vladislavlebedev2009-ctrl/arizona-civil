@@ -4277,3 +4277,1683 @@ textarea:focus {
     color: #fff;
 }
 
+
+/* =========================================================
+   ARIZONA RP CIVIL — PRO REDESIGN
+   Visual layer — functionality untouched
+   ========================================================= */
+
+:root {
+    --ar-bg: #05070d;
+    --ar-bg-2: #090d17;
+    --ar-panel: rgba(14, 19, 31, .82);
+    --ar-panel-strong: rgba(18, 24, 39, .94);
+    --ar-border: rgba(255,255,255,.09);
+    --ar-gold: #f5c451;
+    --ar-gold-soft: rgba(245,196,81,.16);
+    --ar-blue: #39a7ff;
+    --ar-green: #38e39b;
+    --ar-red: #ff5571;
+    --ar-text: #f4f7fb;
+    --ar-muted: #8e99aa;
+    --ar-radius: 18px;
+    --ar-shadow: 0 20px 60px rgba(0,0,0,.35);
+}
+
+/* ---------- BASE ---------- */
+
+html {
+    background: var(--ar-bg);
+}
+
+body {
+    background:
+        radial-gradient(circle at 15% 0%, rgba(57,167,255,.09), transparent 30%),
+        radial-gradient(circle at 85% 10%, rgba(245,196,81,.07), transparent 28%),
+        linear-gradient(180deg, #05070d 0%, #080c15 100%);
+    color: var(--ar-text);
+    min-height: 100vh;
+}
+
+/* subtle grid */
+body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: .035;
+    background-image:
+        linear-gradient(rgba(255,255,255,.5) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.5) 1px, transparent 1px);
+    background-size: 40px 40px;
+    z-index: -1;
+}
+
+/* ---------- SCROLLBAR ---------- */
+
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(245,196,81,.35) transparent;
+}
+
+*::-webkit-scrollbar {
+    width: 7px;
+    height: 7px;
+}
+
+*::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: rgba(245,196,81,.3);
+    border-radius: 99px;
+}
+
+/* ---------- PANELS ---------- */
+
+.card,
+.panel,
+.dashboard-card,
+.stat-card,
+.section-card,
+.table-container,
+.organization-section,
+.content-card {
+    background: var(--ar-panel);
+    border: 1px solid var(--ar-border);
+    border-radius: var(--ar-radius);
+    box-shadow: var(--ar-shadow);
+    backdrop-filter: blur(18px);
+}
+
+/* ---------- HEADINGS ---------- */
+
+h1,
+h2,
+h3 {
+    letter-spacing: -.02em;
+}
+
+h1 {
+    font-weight: 800;
+}
+
+h2 {
+    font-weight: 750;
+}
+
+h3 {
+    font-weight: 700;
+}
+
+/* ---------- BUTTONS ---------- */
+
+button,
+.gold-btn,
+.primary-btn,
+.secondary-btn,
+.danger-btn {
+    border-radius: 11px;
+    transition:
+        transform .18s ease,
+        box-shadow .18s ease,
+        border-color .18s ease,
+        background .18s ease;
+}
+
+button:hover,
+.gold-btn:hover,
+.primary-btn:hover,
+.secondary-btn:hover,
+.danger-btn:hover {
+    transform: translateY(-2px);
+}
+
+.gold-btn,
+.primary-btn {
+    background: linear-gradient(
+        135deg,
+        #f8d46d,
+        #dca936
+    );
+    color: #15110a;
+    border: 1px solid rgba(255,220,120,.5);
+    box-shadow: 0 8px 25px rgba(245,196,81,.16);
+    font-weight: 750;
+}
+
+.gold-btn:hover,
+.primary-btn:hover {
+    box-shadow: 0 12px 35px rgba(245,196,81,.28);
+}
+
+.secondary-btn {
+    background: rgba(255,255,255,.045);
+    border: 1px solid var(--ar-border);
+    color: var(--ar-text);
+}
+
+.secondary-btn:hover {
+    background: rgba(255,255,255,.08);
+    border-color: rgba(255,255,255,.16);
+}
+
+.danger-btn {
+    background: rgba(255,85,113,.08);
+    border: 1px solid rgba(255,85,113,.22);
+    color: #ff7187;
+}
+
+.danger-btn:hover {
+    background: rgba(255,85,113,.15);
+    border-color: rgba(255,85,113,.4);
+    box-shadow: 0 8px 25px rgba(255,85,113,.12);
+}
+
+/* ---------- INPUTS ---------- */
+
+input,
+select,
+textarea {
+    background: rgba(3,6,12,.62) !important;
+    color: var(--ar-text) !important;
+    border: 1px solid rgba(255,255,255,.1) !important;
+    border-radius: 11px !important;
+    transition:
+        border-color .18s ease,
+        box-shadow .18s ease,
+        background .18s ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    outline: none !important;
+    border-color: rgba(245,196,81,.55) !important;
+    box-shadow: 0 0 0 3px rgba(245,196,81,.08) !important;
+    background: rgba(5,9,17,.85) !important;
+}
+
+/* ---------- ORGANIZATIONS ---------- */
+
+.organization-grid {
+    gap: 20px !important;
+}
+
+.organization-card {
+    position: relative;
+    overflow: hidden;
+    background:
+        linear-gradient(
+            145deg,
+            rgba(19,26,42,.94),
+            rgba(8,12,21,.92)
+        ) !important;
+    border: 1px solid rgba(255,255,255,.085) !important;
+    border-radius: 20px !important;
+    box-shadow:
+        0 18px 50px rgba(0,0,0,.28),
+        inset 0 1px 0 rgba(255,255,255,.035);
+    transition:
+        transform .22s ease,
+        border-color .22s ease,
+        box-shadow .22s ease;
+}
+
+.organization-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        linear-gradient(
+            120deg,
+            transparent 30%,
+            rgba(255,255,255,.025),
+            transparent 70%
+        );
+}
+
+.organization-card:hover {
+    transform: translateY(-6px);
+    border-color: rgba(245,196,81,.3) !important;
+    box-shadow:
+        0 25px 65px rgba(0,0,0,.42),
+        0 0 35px rgba(245,196,81,.06);
+}
+
+.organization-icon {
+    border-radius: 14px !important;
+    background:
+        linear-gradient(
+            135deg,
+            rgba(245,196,81,.22),
+            rgba(245,196,81,.06)
+        ) !important;
+    border: 1px solid rgba(245,196,81,.2);
+    box-shadow: 0 0 25px rgba(245,196,81,.08);
+}
+
+.organization-type {
+    color: var(--ar-gold) !important;
+    font-size: 10px !important;
+    letter-spacing: .14em !important;
+}
+
+.organization-status {
+    font-weight: 750;
+    letter-spacing: .08em;
+    font-size: 10px;
+}
+
+.organization-status i {
+    box-shadow: 0 0 10px currentColor;
+}
+
+.organization-divider {
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255,255,255,.1),
+        transparent
+    ) !important;
+}
+
+.organization-info-item {
+    background: rgba(255,255,255,.025);
+    border: 1px solid rgba(255,255,255,.045);
+    border-radius: 13px;
+    padding: 13px !important;
+}
+
+.organization-info-item > span {
+    color: var(--ar-muted) !important;
+    font-size: 10px !important;
+    letter-spacing: .1em;
+}
+
+.organization-leader-avatar {
+    border: 2px solid rgba(245,196,81,.32) !important;
+    box-shadow: 0 0 20px rgba(245,196,81,.1);
+}
+
+/* ---------- STATUS ---------- */
+
+.status.active,
+.org-days-active {
+    color: var(--ar-green) !important;
+}
+
+.status.expired,
+.org-days-expired {
+    color: var(--ar-red) !important;
+}
+
+/* ---------- TABLES ---------- */
+
+table {
+    border-collapse: separate !important;
+    border-spacing: 0 7px !important;
+}
+
+thead th {
+    color: var(--ar-muted) !important;
+    font-size: 10px !important;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+}
+
+tbody tr {
+    background: rgba(255,255,255,.025);
+    transition: background .18s ease, transform .18s ease;
+}
+
+tbody tr:hover {
+    background: rgba(245,196,81,.045);
+}
+
+tbody td {
+    border-top: 1px solid rgba(255,255,255,.045);
+    border-bottom: 1px solid rgba(255,255,255,.045);
+}
+
+tbody td:first-child {
+    border-left: 1px solid rgba(255,255,255,.045);
+    border-radius: 12px 0 0 12px;
+}
+
+tbody td:last-child {
+    border-right: 1px solid rgba(255,255,255,.045);
+    border-radius: 0 12px 12px 0;
+}
+
+/* ---------- MODAL ---------- */
+
+#modal {
+    backdrop-filter: blur(10px);
+}
+
+#modal-content {
+    background:
+        linear-gradient(
+            145deg,
+            rgba(18,25,40,.97),
+            rgba(7,11,19,.98)
+        ) !important;
+    border: 1px solid rgba(245,196,81,.14) !important;
+    border-radius: 22px !important;
+    box-shadow:
+        0 35px 100px rgba(0,0,0,.65),
+        0 0 50px rgba(245,196,81,.05);
+}
+
+.neon-modal-head h2,
+.neon-modal-header h2 {
+    font-weight: 800;
+}
+
+.neon-modal-head span,
+.neon-modal-header span {
+    color: var(--ar-gold) !important;
+    letter-spacing: .14em;
+    font-size: 10px;
+}
+
+/* ---------- PROFILE ---------- */
+
+#profile-avatar {
+    border: 2px solid rgba(245,196,81,.35);
+    box-shadow: 0 0 25px rgba(245,196,81,.12);
+}
+
+/* ---------- LINKS ---------- */
+
+a {
+    transition: color .18s ease, opacity .18s ease;
+}
+
+.vk-link,
+.organization-vk a,
+.org-deputy-vk a {
+    color: #5baeff !important;
+}
+
+.vk-link:hover,
+.organization-vk a:hover,
+.org-deputy-vk a:hover {
+    color: #8bc8ff !important;
+}
+
+/* ---------- MOBILE ---------- */
+
+@media (max-width: 700px) {
+
+    body {
+        background:
+            radial-gradient(
+                circle at 50% 0%,
+                rgba(57,167,255,.08),
+                transparent 35%
+            ),
+            #05070d;
+    }
+
+    .organization-grid {
+        grid-template-columns: 1fr !important;
+        gap: 14px !important;
+    }
+
+    .organization-card {
+        border-radius: 17px !important;
+    }
+
+    .organization-info {
+        gap: 8px !important;
+    }
+
+    button,
+    .gold-btn,
+    .primary-btn,
+    .secondary-btn,
+    .danger-btn {
+        min-height: 42px;
+    }
+
+    #modal-content {
+        width: calc(100% - 24px) !important;
+        max-height: calc(100vh - 24px);
+        overflow-y: auto;
+        border-radius: 18px !important;
+    }
+}
+
+/* ---------- REDUCED MOTION ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+    }
+}
+
+
+
+/* =========================================================
+   ARIZONA CIVIL 2.0 — SUPERVISORS
+   ========================================================= */
+
+.supervisors-v2 {
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(290px,1fr));
+    gap:20px;
+}
+
+.supervisor-modern-card.v2 {
+    position:relative;
+    overflow:hidden;
+    border-radius:22px;
+    padding:22px;
+    background:
+        linear-gradient(
+            145deg,
+            rgba(255,255,255,.075),
+            rgba(255,255,255,.025)
+        );
+    border:1px solid rgba(255,255,255,.12);
+    box-shadow:
+        0 15px 45px rgba(0,0,0,.25),
+        inset 0 1px rgba(255,255,255,.06);
+    transition:.25s ease;
+}
+
+.supervisor-modern-card.v2:hover {
+    transform:translateY(-5px);
+    border-color:rgba(255,200,70,.4);
+    box-shadow:
+        0 20px 55px rgba(0,0,0,.35),
+        0 0 30px rgba(255,190,50,.08);
+}
+
+.supervisor-v2-badge {
+    display:inline-flex;
+    align-items:center;
+    padding:6px 10px;
+    border-radius:999px;
+    font-size:10px;
+    font-weight:800;
+    letter-spacing:.8px;
+    background:rgba(255,255,255,.07);
+    border:1px solid rgba(255,255,255,.1);
+}
+
+.supervisor-v2-role {
+    margin-top:12px;
+    font-size:13px;
+    font-weight:800;
+}
+
+.supervisor-v2-vk {
+    margin-top:8px;
+    font-size:13px;
+}
+
+.supervisor-v2-assistants {
+    margin-top:18px;
+    padding-top:15px;
+    border-top:1px solid rgba(255,255,255,.08);
+}
+
+.supervisor-v2-assistants-title {
+    font-size:10px;
+    font-weight:800;
+    opacity:.55;
+    letter-spacing:1px;
+    margin-bottom:9px;
+}
+
+.supervisor-v2-assistant {
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:9px 10px;
+    margin-top:7px;
+    border-radius:12px;
+    background:rgba(255,255,255,.045);
+}
+
+.supervisor-v2-assistant-avatar {
+    width:32px;
+    height:32px;
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:800;
+    background:rgba(255,255,255,.08);
+}
+
+.supervisor-v2-assistant-info {
+    min-width:0;
+}
+
+.supervisor-v2-assistant-info strong {
+    display:block;
+    font-size:13px;
+}
+
+.supervisor-v2-assistant-info span {
+    display:block;
+    margin-top:2px;
+    font-size:11px;
+    opacity:.55;
+}
+
+@media(max-width:600px) {
+    .supervisors-v2 {
+        grid-template-columns:1fr;
+    }
+
+    .supervisor-modern-card.v2 {
+        padding:18px;
+    }
+}
+
+
+/* =========================================================
+   ARIZONA CIVIL 2.0 — SUPERVISORS FINAL DESIGN
+========================================================= */
+
+.supervisors-v2 {
+    width: 100%;
+    animation: supervisorV2Appear .35s ease;
+}
+
+.supervisors-v2-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 24px;
+}
+
+.supervisors-v2-title span {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 2px;
+    opacity: .55;
+}
+
+.supervisors-v2-title h2 {
+    margin: 4px 0 0;
+    font-size: 28px;
+}
+
+.supervisors-v2-count {
+    min-width: 80px;
+    padding: 12px 18px;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 16px;
+    text-align: center;
+    font-size: 22px;
+    font-weight: 800;
+    background: rgba(255,255,255,.035);
+}
+
+.supervisors-v2-count small {
+    display: block;
+    margin-top: 2px;
+    font-size: 10px;
+    font-weight: 500;
+    opacity: .5;
+}
+
+.supervisors-v2-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+    gap: 18px;
+}
+
+.supervisor-v2-card {
+    position: relative;
+    overflow: hidden;
+    padding: 22px;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 24px;
+    background:
+        linear-gradient(
+            145deg,
+            rgba(255,255,255,.07),
+            rgba(255,255,255,.025)
+        );
+    box-shadow: 0 18px 55px rgba(0,0,0,.22);
+    transition:
+        transform .25s ease,
+        border-color .25s ease,
+        box-shadow .25s ease;
+}
+
+.supervisor-v2-card:hover {
+    transform: translateY(-4px);
+    border-color: rgba(255,255,255,.2);
+    box-shadow: 0 25px 70px rgba(0,0,0,.3);
+}
+
+.supervisor-v2-card-glow {
+    position: absolute;
+    width: 180px;
+    height: 180px;
+    right: -90px;
+    top: -90px;
+    border-radius: 50%;
+    background: rgba(255,255,255,.06);
+    filter: blur(30px);
+    pointer-events: none;
+}
+
+.supervisor-v2-head {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.supervisor-v2-avatar {
+    position: relative;
+    width: 64px;
+    height: 64px;
+    flex: 0 0 64px;
+    overflow: hidden;
+    border-radius: 19px;
+    border: 1px solid rgba(255,255,255,.15);
+    background: rgba(255,255,255,.07);
+}
+
+.supervisor-v2-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.supervisor-v2-avatar-fallback {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    font-weight: 800;
+}
+
+.supervisor-v2-person {
+    min-width: 0;
+    flex: 1;
+}
+
+.supervisor-v2-label {
+    font-size: 9px;
+    letter-spacing: 1.6px;
+    opacity: .45;
+}
+
+.supervisor-v2-person h3 {
+    margin: 3px 0;
+    font-size: 19px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.supervisor-v2-position {
+    font-size: 12px;
+    opacity: .58;
+}
+
+.supervisor-v2-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 8px;
+    letter-spacing: 1px;
+    opacity: .55;
+}
+
+.supervisor-v2-status span {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #54e38e;
+    box-shadow: 0 0 10px #54e38e;
+}
+
+.supervisor-v2-vk-wrap {
+    margin-top: 13px;
+    font-size: 12px;
+}
+
+.supervisor-v2-divider {
+    height: 1px;
+    margin: 17px 0;
+    background: rgba(255,255,255,.08);
+}
+
+.supervisor-v2-assistants-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    font-size: 10px;
+    letter-spacing: 1.2px;
+    opacity: .55;
+}
+
+.supervisor-v2-assistants-title b {
+    min-width: 22px;
+    padding: 3px 6px;
+    border-radius: 8px;
+    text-align: center;
+    background: rgba(255,255,255,.08);
+    font-size: 10px;
+}
+
+.supervisor-v2-assistant {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    margin-top: 7px;
+    border: 1px solid rgba(255,255,255,.07);
+    border-radius: 14px;
+    background: rgba(255,255,255,.035);
+}
+
+.supervisor-v2-assistant-avatar {
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    overflow: hidden;
+    border-radius: 11px;
+    background: rgba(255,255,255,.07);
+}
+
+.supervisor-v2-assistant-avatar .supervisor-v2-avatar-img {
+    width: 100%;
+    height: 100%;
+}
+
+.supervisor-v2-assistant-info {
+    min-width: 0;
+    flex: 1;
+}
+
+.supervisor-v2-assistant-info strong {
+    display: block;
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.supervisor-v2-assistant-info span {
+    display: block;
+    margin-top: 2px;
+    font-size: 10px;
+    opacity: .5;
+}
+
+.supervisor-v2-assistant-info small {
+    display: block;
+    margin-top: 3px;
+}
+
+.supervisor-v2-assistant-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.supervisor-v2-assistant-actions button {
+    width: 30px;
+    height: 30px;
+    border: 1px solid rgba(255,255,255,.1);
+    border-radius: 9px;
+    background: rgba(255,255,255,.05);
+    cursor: pointer;
+}
+
+.supervisor-v2-no-assistants {
+    padding: 12px;
+    border: 1px dashed rgba(255,255,255,.1);
+    border-radius: 13px;
+    text-align: center;
+    font-size: 11px;
+    opacity: .4;
+}
+
+.supervisor-v2-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 17px;
+}
+
+.supervisor-v2-btn {
+    flex: 1;
+    min-height: 38px;
+    border: 1px solid rgba(255,255,255,.11);
+    border-radius: 11px;
+    background: rgba(255,255,255,.055);
+    color: inherit;
+    cursor: pointer;
+    font-size: 11px;
+    transition: .2s ease;
+}
+
+.supervisor-v2-btn:hover {
+    background: rgba(255,255,255,.1);
+}
+
+.supervisor-v2-btn-assistant {
+    border-color: rgba(255,255,255,.18);
+}
+
+.supervisors-v2-empty {
+    padding: 60px 25px;
+    text-align: center;
+    border: 1px dashed rgba(255,255,255,.12);
+    border-radius: 24px;
+}
+
+.supervisor-v2-empty-icon {
+    width: 65px;
+    height: 65px;
+    margin: 0 auto 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 20px;
+    background: rgba(255,255,255,.06);
+    font-size: 25px;
+}
+
+.supervisors-v2-empty h3 {
+    margin: 0 0 7px;
+}
+
+.supervisors-v2-empty p {
+    margin: 0 0 18px;
+    opacity: .5;
+    font-size: 13px;
+}
+
+@keyframes supervisorV2Appear {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (max-width: 650px) {
+
+    .supervisors-v2-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .supervisors-v2-title h2 {
+        font-size: 23px;
+    }
+
+    .supervisor-v2-card {
+        padding: 17px;
+        border-radius: 20px;
+    }
+
+    .supervisor-v2-status {
+        display: none;
+    }
+
+    .supervisor-v2-actions {
+        flex-direction: column;
+    }
+}
+
+
+
+/* =========================================================
+   ARIZONA_CIVIL_201_CSS
+========================================================= */
+
+.supervisors-v201 {
+
+    display: grid;
+
+    grid-template-columns:
+        repeat(
+            auto-fit,
+            minmax(340px, 1fr)
+        );
+
+    gap: 20px;
+
+}
+
+
+.supervisor-v201-card {
+
+    position: relative;
+
+    overflow: hidden;
+
+    padding: 22px;
+
+    border-radius: 24px;
+
+    border:
+        1px solid
+        rgba(255,255,255,.10);
+
+    background:
+        linear-gradient(
+            145deg,
+            rgba(24,25,34,.98),
+            rgba(10,11,17,.98)
+        );
+
+    box-shadow:
+        0 18px 50px
+        rgba(0,0,0,.28);
+
+    transition:
+        transform .2s ease,
+        border-color .2s ease;
+
+}
+
+
+.supervisor-v201-card:hover {
+
+    transform:
+        translateY(-3px);
+
+    border-color:
+        rgba(255,210,90,.35);
+
+}
+
+
+.supervisor-v201-header {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 14px;
+
+}
+
+
+.supervisor-v201-avatar {
+
+    width: 62px;
+    height: 62px;
+
+    flex:
+        0 0 62px;
+
+    display: grid;
+
+    place-items: center;
+
+    overflow: hidden;
+
+    border-radius: 18px;
+
+    background:
+        rgba(255,255,255,.08);
+
+    font-size: 25px;
+
+    font-weight: 800;
+
+}
+
+
+.supervisor-v201-avatar img {
+
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
+
+}
+
+
+.supervisor-v201-title {
+
+    min-width: 0;
+
+}
+
+
+.supervisor-v201-title small {
+
+    display: block;
+
+    font-size: 9px;
+
+    letter-spacing:
+        1.6px;
+
+    opacity: .45;
+
+}
+
+
+.supervisor-v201-title h3 {
+
+    margin:
+        3px 0;
+
+    font-size: 20px;
+
+}
+
+
+.supervisor-v201-title span {
+
+    font-size: 12px;
+
+    opacity: .65;
+
+}
+
+
+.supervisor-v201-status {
+
+    margin-left: auto;
+
+    padding:
+        6px 9px;
+
+    border-radius: 999px;
+
+    font-size: 9px;
+
+    letter-spacing:
+        1px;
+
+    background:
+        rgba(50,220,130,.10);
+
+}
+
+
+.supervisor-v201-info {
+
+    display: grid;
+
+    grid-template-columns:
+        1fr 1fr;
+
+    gap: 10px;
+
+    margin:
+        20px 0;
+
+}
+
+
+.supervisor-v201-info > div {
+
+    padding:
+        12px;
+
+    border-radius:
+        14px;
+
+    background:
+        rgba(255,255,255,.035);
+
+}
+
+
+.supervisor-v201-info small {
+
+    display: block;
+
+    font-size: 9px;
+
+    opacity: .45;
+
+}
+
+
+.supervisor-v201-info span {
+
+    display: block;
+
+    margin-top:
+        5px;
+
+    font-size: 12px;
+
+}
+
+
+.supervisor-v201-assistants {
+
+    padding-top:
+        15px;
+
+    border-top:
+        1px solid
+        rgba(255,255,255,.08);
+
+}
+
+
+.supervisor-v201-section-title {
+
+    margin-bottom:
+        10px;
+
+    font-size: 9px;
+
+    letter-spacing:
+        1.5px;
+
+    opacity: .45;
+
+}
+
+
+.supervisor-v201-assistant {
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+
+    padding:
+        10px;
+
+    margin-top:
+        7px;
+
+    border-radius:
+        14px;
+
+    background:
+        rgba(255,255,255,.035);
+
+}
+
+
+.supervisor-v201-assistant-avatar {
+
+    width: 38px;
+    height: 38px;
+
+    flex:
+        0 0 38px;
+
+    display: grid;
+
+    place-items: center;
+
+    overflow: hidden;
+
+    border-radius:
+        12px;
+
+    background:
+        rgba(255,255,255,.08);
+
+    font-weight:
+        700;
+
+}
+
+
+.supervisor-v201-assistant-avatar img {
+
+    width: 100%;
+    height: 100%;
+
+    object-fit: cover;
+
+}
+
+
+.supervisor-v201-assistant-data {
+
+    flex: 1;
+
+    min-width: 0;
+
+}
+
+
+.supervisor-v201-assistant-data strong {
+
+    display: block;
+
+    font-size: 13px;
+
+}
+
+
+.supervisor-v201-assistant-data span {
+
+    display: block;
+
+    margin-top:
+        2px;
+
+    font-size: 10px;
+
+    opacity: .55;
+
+}
+
+
+.supervisor-v201-assistant-data small {
+
+    display: block;
+
+    margin-top:
+        3px;
+
+    font-size: 9px;
+
+    opacity: .4;
+
+}
+
+
+.supervisor-v201-assistant button {
+
+    width: 32px;
+    height: 32px;
+
+    border: 0;
+
+    border-radius:
+        10px;
+
+    background:
+        rgba(255,255,255,.06);
+
+    cursor: pointer;
+
+}
+
+
+.supervisor-v201-empty {
+
+    padding:
+        12px;
+
+    font-size: 12px;
+
+    opacity: .45;
+
+}
+
+
+.supervisor-v201-actions {
+
+    display: flex;
+
+    gap: 8px;
+
+    margin-top:
+        16px;
+
+}
+
+
+.supervisor-v201-actions button {
+
+    flex: 1;
+
+    padding:
+        10px;
+
+    border:
+        1px solid
+        rgba(255,255,255,.10);
+
+    border-radius:
+        12px;
+
+    background:
+        rgba(255,255,255,.05);
+
+    cursor: pointer;
+
+}
+
+
+@media (max-width: 600px) {
+
+    .supervisors-v201 {
+
+        grid-template-columns:
+            1fr;
+
+    }
+
+    .supervisor-v201-info {
+
+        grid-template-columns:
+            1fr;
+
+    }
+
+}
+
+
+
+/* =========================================================
+   ARIZONA_CIVIL_ROLE_FINAL_CSS
+========================================================= */
+
+.supervisor-v201-assistant {
+
+    border:
+        1px solid
+        rgba(255, 210, 90, .10);
+
+}
+
+.supervisor-v201-assistant-data span {
+
+    color:
+        rgba(255, 210, 90, .85);
+
+}
+
+.role-leader {
+
+    border-color:
+        rgba(255, 210, 90, .35) !important;
+
+}
+
+.role-deputy {
+
+    border-color:
+        rgba(130, 180, 255, .35) !important;
+
+}
+
+
+
+/* =========================================================
+   ARIZONA CIVIL 3.0 UI
+========================================================= */
+
+:root {
+    --ac-bg: #070a12;
+    --ac-panel: rgba(15, 20, 32, .82);
+    --ac-panel-2: rgba(20, 27, 43, .92);
+    --ac-border: rgba(255,255,255,.08);
+    --ac-text: #f5f7fb;
+    --ac-muted: #8993a8;
+    --ac-accent: #d8b15a;
+    --ac-accent-2: #8c6b2d;
+    --ac-success: #55d98b;
+    --ac-danger: #ff647c;
+    --ac-radius: 20px;
+}
+
+.arizona-v3 {
+    min-height: 100%;
+    padding: 28px;
+    background:
+        radial-gradient(
+            circle at 10% 0%,
+            rgba(216,177,90,.12),
+            transparent 30%
+        ),
+        radial-gradient(
+            circle at 90% 20%,
+            rgba(80,110,255,.08),
+            transparent 35%
+        );
+}
+
+.v3-dashboard {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0,1fr));
+    gap: 18px;
+    margin-bottom: 24px;
+}
+
+.v3-stat {
+    background: var(--ac-panel);
+    border: 1px solid var(--ac-border);
+    border-radius: var(--ac-radius);
+    padding: 22px;
+    backdrop-filter: blur(18px);
+    box-shadow: 0 15px 50px rgba(0,0,0,.22);
+}
+
+.v3-stat span {
+    display: block;
+    color: var(--ac-muted);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: .12em;
+}
+
+.v3-stat strong {
+    display: block;
+    margin-top: 8px;
+    font-size: 32px;
+    color: var(--ac-text);
+}
+
+.v3-toolbar {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+.v3-input,
+.v3-select {
+    min-height: 46px;
+    padding: 0 15px;
+    border-radius: 13px;
+    border: 1px solid var(--ac-border);
+    background: var(--ac-panel-2);
+    color: var(--ac-text);
+    outline: none;
+}
+
+.v3-input:focus,
+.v3-select:focus {
+    border-color: rgba(216,177,90,.65);
+    box-shadow: 0 0 0 3px rgba(216,177,90,.08);
+}
+
+.v3-personnel-grid {
+    display: grid;
+    grid-template-columns:
+        repeat(auto-fill, minmax(280px, 1fr));
+    gap: 18px;
+}
+
+.v3-person-card {
+    position: relative;
+    overflow: hidden;
+    background: var(--ac-panel);
+    border: 1px solid var(--ac-border);
+    border-radius: var(--ac-radius);
+    padding: 20px;
+    transition: .2s ease;
+}
+
+.v3-person-card:hover {
+    transform: translateY(-3px);
+    border-color: rgba(216,177,90,.35);
+    box-shadow: 0 20px 55px rgba(0,0,0,.28);
+}
+
+.v3-person-top {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.v3-avatar {
+    width: 58px;
+    height: 58px;
+    border-radius: 16px;
+    object-fit: cover;
+    background: linear-gradient(
+        135deg,
+        var(--ac-accent-2),
+        #171c2b
+    );
+    display: grid;
+    place-items: center;
+    color: white;
+    font-weight: 800;
+    font-size: 20px;
+}
+
+.v3-person-name {
+    color: var(--ac-text);
+    font-size: 17px;
+    font-weight: 750;
+}
+
+.v3-person-role {
+    margin-top: 4px;
+    color: var(--ac-accent);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.v3-person-meta {
+    display: grid;
+    gap: 8px;
+    margin-top: 18px;
+    padding-top: 16px;
+    border-top: 1px solid var(--ac-border);
+}
+
+.v3-person-meta div {
+    display: flex;
+    justify-content: space-between;
+    gap: 15px;
+}
+
+.v3-person-meta span {
+    color: var(--ac-muted);
+    font-size: 12px;
+}
+
+.v3-person-meta strong {
+    color: var(--ac-text);
+    font-size: 13px;
+    text-align: right;
+}
+
+.v3-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 18px;
+}
+
+.v3-btn {
+    flex: 1;
+    min-height: 40px;
+    border: 1px solid var(--ac-border);
+    border-radius: 11px;
+    background: rgba(255,255,255,.04);
+    color: var(--ac-text);
+    cursor: pointer;
+}
+
+.v3-btn:hover {
+    background: rgba(216,177,90,.12);
+}
+
+.v3-btn.primary {
+    background: linear-gradient(
+        135deg,
+        var(--ac-accent),
+        var(--ac-accent-2)
+    );
+    color: #101010;
+    border: 0;
+}
+
+.v3-role-badge {
+    display: inline-flex;
+    padding: 5px 9px;
+    border-radius: 999px;
+    background: rgba(216,177,90,.1);
+    color: var(--ac-accent);
+    font-size: 11px;
+    font-weight: 800;
+}
+
+.v3-section {
+    background: var(--ac-panel);
+    border: 1px solid var(--ac-border);
+    border-radius: var(--ac-radius);
+    padding: 22px;
+    margin-bottom: 20px;
+}
+
+.v3-section-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+    margin-bottom: 18px;
+}
+
+.v3-section-title h2 {
+    margin: 0;
+    color: var(--ac-text);
+}
+
+.v3-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--ac-muted);
+}
+
+@media (max-width: 1000px) {
+    .v3-dashboard {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 600px) {
+    .arizona-v3 {
+        padding: 14px;
+    }
+
+    .v3-dashboard {
+        grid-template-columns: 1fr;
+    }
+
+    .v3-personnel-grid {
+        grid-template-columns: 1fr;
+    }
+}

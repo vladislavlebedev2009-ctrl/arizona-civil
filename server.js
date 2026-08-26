@@ -1,13 +1,131 @@
+
+/* ARIZONA CIVIL FINAL ROLE LEVELS */
+
+const FINAL_ROLE_LEVEL = {
+
+    "Пользователь": 0,
+
+    "Помощник следящего": 5,
+
+    "Следящий": 10,
+
+    "Лидер": 12,
+
+    "Заместитель": 13,
+
+    "ЗГС гражданских": 20,
+
+    "ГС гражданских": 30,
+
+    "ЗГС ГОС": 40,
+
+    "ГС ГОС": 50,
+
+    "Разработчик": 100
+
+};
+
+function finalRoleLevel(role) {
+    return FINAL_ROLE_LEVEL[role] ?? 0;
+}
+
+function canManageUserRoles(role) {
+
+    return [
+        "Разработчик",
+        "ГС ГОС",
+        "ЗГС ГОС",
+        "ГС гражданских",
+        "ЗГС гражданских"
+    ].includes(role);
+
+}
+
+function canAssignRole(actorRole, targetRole) {
+
+    if (!canManageUserRoles(actorRole)) {
+        return false;
+    }
+
+    return [
+        "Лидер",
+        "Заместитель"
+    ].includes(targetRole);
+
+}
+
 require('dotenv').config();
 const express = require("express");
 const session = require("express-session");
+const pgSession = require("connect-pg-simple")(session);
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const { initDatabase, query } = require("./db");
+const { initDatabase, initDatabaseV30, query, pool } = require("./db");
+const {
+    canManagePersonnel,
+    canManageSupervisors,
+    canAssignLeader,
+    canAssignDeputy,
+    canManageAssistant,
+    canManageOwnStructure
+} = require("./permissions");
+
+async function initSupervisorV2() {
+    try {
+        await query(`
+            ALTER TABLE supervisors
+            ADD COLUMN IF NOT EXISTS vk TEXT
+        `);
+
+        await query(`
+            ALTER TABLE supervisors
+            ADD COLUMN IF NOT EXISTS avatar_url TEXT
+        `);
+
+        await query(`
+            ALTER TABLE supervisors
+            ADD COLUMN IF NOT EXISTS supervisor_id BIGINT
+        `);
+
+        await query(`
+            CREATE INDEX IF NOT EXISTS idx_supervisors_supervisor_id
+            ON supervisors(supervisor_id)
+        `);
+
+
+        await query(`
+            CREATE TABLE IF NOT EXISTS supervisor_assistants (
+                id BIGINT PRIMARY KEY,
+                supervisor_id BIGINT REFERENCES supervisors(id) ON DELETE CASCADE,
+                name VARCHAR(150) NOT NULL,
+                role VARCHAR(100) NOT NULL DEFAULT 'Помощник следящего',
+                position VARCHAR(200) NOT NULL DEFAULT 'Помощник следящего',
+                vk TEXT DEFAULT '',
+                avatar_url TEXT DEFAULT '',
+                created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+                updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            )
+        `);
+
+        await query(`
+            CREATE INDEX IF NOT EXISTS idx_supervisor_assistants_supervisor
+            ON supervisor_assistants(supervisor_id)
+        `);
+
+        await query(`
+            CREATE INDEX IF NOT EXISTS idx_supervisor_assistants_created
+            ON supervisor_assistants(created_at DESC)
+        `);
+
+        console.log("✅ Arizona Civil 2.0: supervisors обновлены");
+    } catch (error) {
+        console.error("❌ Ошибка миграции supervisors:", error.message);
+    }
+}
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 const DATA_FILE = path.join(__dirname, "arizona-data.json");
 
@@ -35,18 +153,100 @@ const ROLES = {
     ZGS_GOS: "ЗГС ГОС",
     GS_CIVIL: "ГС гражданских",
     ZGS_CIVIL: "ЗГС гражданских",
-    FOLLOWER: "Следящий"
+    FOLLOWER: "Следящий",
+    LEADER: "Лидер",
+    DEPUTY: "Заместитель",
+    SUPERVISOR_ASSISTANT: "Помощник следящего"
 };
 
 const ROLE_LEVEL = {
     [ROLES.USER]: 0,
+    [ROLES.ASSISTANT]: 5,
     [ROLES.FOLLOWER]: 10,
+    [ROLES.SUPERVISOR_ASSISTANT]: 15,
     [ROLES.ZGS_CIVIL]: 20,
     [ROLES.GS_CIVIL]: 30,
     [ROLES.ZGS_GOS]: 40,
     [ROLES.GS_GOS]: 50,
     [ROLES.DEVELOPER]: 100
 };
+
+
+/* =========================================================
+   ARIZONA_CIVIL_201_PERMISSIONS
+========================================================= */
+
+const ROLE_PERMISSIONS = {
+    [ROLES.USER]: [
+        "view"
+    ],
+
+    [ROLES.ASSISTANT]: [
+        "view",
+        "view_civil",
+        "view_supervisors",
+        "view_leaders"
+    ],
+
+    [ROLES.FOLLOWER]: [
+        "view",
+        "view_civil",
+        "view_supervisors",
+        "view_leaders",
+        "manage_own_assistants"
+    ],
+
+    [ROLES.ZGS_CIVIL]: [
+        "view",
+        "view_civil",
+        "view_supervisors",
+        "view_leaders",
+        "manage_supervisors",
+        "manage_assistants",
+        "manage_deputies",
+        "manage_civil"
+    ],
+
+    [ROLES.GS_CIVIL]: [
+        "view",
+        "view_civil",
+        "view_supervisors",
+        "view_leaders",
+        "manage_supervisors",
+        "manage_assistants",
+        "manage_deputies",
+        "manage_civil",
+        "manage_penalties"
+    ],
+
+    [ROLES.ZGS_GOS]: [
+        "view",
+        "view_gos",
+        "manage_gos_leaders",
+        "manage_gos_deputies"
+    ],
+
+    [ROLES.GS_GOS]: [
+        "view",
+        "view_gos",
+        "manage_gos_leaders",
+        "manage_gos_deputies",
+        "manage_gos"
+    ],
+
+    [ROLES.DEVELOPER]: [
+        "*"
+    ]
+};
+
+function hasPermission(role, permission) {
+    const permissions = ROLE_PERMISSIONS[role] || [];
+
+    return (
+        permissions.includes("*") ||
+        permissions.includes(permission)
+    );
+}
 
 function createDatabase() {
     if (!fs.existsSync(DATA_FILE)) {
@@ -185,19 +385,415 @@ createDatabase();
 
 app.use(express.json());
 
+/*
+=========================================================
+ ARIZONA CIVIL 2.2 — RENDER HEALTH CHECK
+=========================================================
+*/
+
+
+
+/*
+=========================================================
+ ARIZONA CIVIL 2.2 — PERSONNEL API
+=========================================================
+*/
+
+app.get(
+    "/api/personnel/:id/history",
+    requireAuth,
+    async (req, res) => {
+        try {
+            const result = await query(
+                `
+                SELECT
+                    id,
+                    action,
+                    details,
+                    actor,
+                    created_at
+                FROM personnel_history
+                WHERE user_id = $1
+                ORDER BY created_at DESC
+                `,
+                [Number(req.params.id)]
+            );
+
+            res.json(result.rows);
+        } catch (error) {
+            console.error("Personnel history:", error);
+            res.status(500).json({
+                error: "Ошибка получения истории"
+            });
+        }
+    }
+);
+
+app.post(
+    "/api/users/:id/leader",
+    requireAuth,
+    async (req, res) => {
+        const actor = req.session.user;
+
+        if (!canAssignLeader(actor.role)) {
+            return res.status(403).json({
+                error: "Недостаточно прав"
+            });
+        }
+
+        const userId = Number(req.params.id);
+        const organization =
+            String(req.body.organization || "").trim();
+
+        if (!organization) {
+            return res.status(400).json({
+                error: "Укажите организацию"
+            });
+        }
+
+        try {
+            const userResult = await query(
+                `
+                SELECT id, username, role
+                FROM users
+                WHERE id = $1
+                `,
+                [userId]
+            );
+
+            if (!userResult.rows.length) {
+                return res.status(404).json({
+                    error: "Пользователь не найден"
+                });
+            }
+
+            const user = userResult.rows[0];
+            const oldRole = user.role;
+
+            await query(
+                `
+                UPDATE users
+                SET
+                    role = 'Лидер',
+                    organization = $1,
+                    appointed_at = NOW(),
+                    appointed_by = $2
+                WHERE id = $3
+                `,
+                [
+                    organization,
+                    actor.username,
+                    userId
+                ]
+            );
+
+            await query(
+                `
+                INSERT INTO appointments
+                    (
+                        user_id,
+                        organization,
+                        role,
+                        appointed_by
+                    )
+                VALUES
+                    ($1, $2, 'Лидер', $3)
+                `,
+                [
+                    userId,
+                    organization,
+                    actor.username
+                ]
+            );
+
+            await query(
+                `
+                INSERT INTO role_history
+                    (
+                        user_id,
+                        old_role,
+                        new_role,
+                        changed_by
+                    )
+                VALUES
+                    ($1, $2, 'Лидер', $3)
+                `,
+                [
+                    userId,
+                    oldRole,
+                    actor.username
+                ]
+            );
+
+            await query(
+                `
+                INSERT INTO personnel_history
+                    (
+                        user_id,
+                        action,
+                        details,
+                        actor
+                    )
+                VALUES
+                    (
+                        $1,
+                        'Назначен лидером',
+                        $2,
+                        $3
+                    )
+                `,
+                [
+                    userId,
+                    organization,
+                    actor.username
+                ]
+            );
+
+            await audit(
+                actor.username,
+                "Назначен лидер",
+                `${user.username}: ${organization}`,
+                userId
+            );
+
+            res.json({
+                success: true,
+                role: "Лидер"
+            });
+
+        } catch (error) {
+            console.error("Назначение лидера:", error);
+            res.status(500).json({
+                error: "Ошибка назначения"
+            });
+        }
+    }
+);
+
+app.post(
+    "/api/users/:id/deputy",
+    requireAuth,
+    async (req, res) => {
+        const actor = req.session.user;
+
+        if (!canAssignDeputy(actor.role)) {
+            return res.status(403).json({
+                error: "Недостаточно прав"
+            });
+        }
+
+        const userId = Number(req.params.id);
+        const organization =
+            String(req.body.organization || "").trim();
+
+        if (!organization) {
+            return res.status(400).json({
+                error: "Укажите организацию"
+            });
+        }
+
+        try {
+            const userResult = await query(
+                `
+                SELECT id, username, role
+                FROM users
+                WHERE id = $1
+                `,
+                [userId]
+            );
+
+            if (!userResult.rows.length) {
+                return res.status(404).json({
+                    error: "Пользователь не найден"
+                });
+            }
+
+            const user = userResult.rows[0];
+            const oldRole = user.role;
+
+            await query(
+                `
+                UPDATE users
+                SET
+                    role = 'Заместитель',
+                    organization = $1,
+                    appointed_at = NOW(),
+                    appointed_by = $2
+                WHERE id = $3
+                `,
+                [
+                    organization,
+                    actor.username,
+                    userId
+                ]
+            );
+
+            await query(
+                `
+                INSERT INTO appointments
+                    (
+                        user_id,
+                        organization,
+                        role,
+                        appointed_by
+                    )
+                VALUES
+                    ($1, $2, 'Заместитель', $3)
+                `,
+                [
+                    userId,
+                    organization,
+                    actor.username
+                ]
+            );
+
+            await query(
+                `
+                INSERT INTO role_history
+                    (
+                        user_id,
+                        old_role,
+                        new_role,
+                        changed_by
+                    )
+                VALUES
+                    ($1, $2, 'Заместитель', $3)
+                `,
+                [
+                    userId,
+                    oldRole,
+                    actor.username
+                ]
+            );
+
+            await query(
+                `
+                INSERT INTO personnel_history
+                    (
+                        user_id,
+                        action,
+                        details,
+                        actor
+                    )
+                VALUES
+                    (
+                        $1,
+                        'Назначен заместителем',
+                        $2,
+                        $3
+                    )
+                `,
+                [
+                    userId,
+                    organization,
+                    actor.username
+                ]
+            );
+
+            await audit(
+                actor.username,
+                "Назначен заместитель",
+                `${user.username}: ${organization}`,
+                userId
+            );
+
+            res.json({
+                success: true,
+                role: "Заместитель"
+            });
+
+        } catch (error) {
+            console.error("Назначение заместителя:", error);
+            res.status(500).json({
+                error: "Ошибка назначения"
+            });
+        }
+    }
+);
+
+app.get("/health", async (req, res) => {
+    try {
+        await query("SELECT 1");
+
+        res.status(200).json({
+            status: "ok",
+            service: "arizona-civil",
+            version: "2.2",
+            database: "connected",
+            uptime: Math.floor(process.uptime())
+        });
+    } catch (error) {
+        console.error("Health check DB error:", error.message);
+
+        res.status(503).json({
+            status: "error",
+            database: "disconnected"
+        });
+    }
+});
+
+
+
 // Статические файлы сайта: CSS, JS, изображения и т.д.
+
+
+/* =========================================================
+   RENDER HEALTH CHECK
+========================================================= */
+
+app.get(
+    "/health",
+    async (req, res) => {
+
+        try {
+
+            await query(
+                "SELECT 1"
+            );
+
+            res.status(200).json({
+                status: "ok",
+                service: "arizona-civil",
+                database: "ok",
+                uptime:
+                    Math.floor(
+                        process.uptime()
+                    )
+            });
+
+        } catch (error) {
+
+            res.status(503).json({
+                status: "error",
+                database: "offline"
+            });
+
+        }
+
+    }
+);
+
+
 app.use(express.static(path.join(__dirname, "public")));
 
 app.use(session({
+    store: new pgSession({
+        pool,
+        tableName: "user_sessions",
+        createTableIfMissing: true
+    }),
+
     secret: process.env.SESSION_SECRET ||
         "CHANGE_THIS_SECRET_ARIZONA_CIVIL",
+
     resave: false,
     saveUninitialized: false,
+
     cookie: {
         httpOnly: true,
         sameSite: "lax",
         secure: false,
-        maxAge: 24 * 60 * 60 * 1000
+        maxAge: 30 * 24 * 60 * 60 * 1000
     }
 }));
 
@@ -451,7 +1047,8 @@ app.post("/api/auth/login", async (req, res) => {
                 username,
                 password_hash,
                 role,
-                active
+                active,
+                avatar_url
             FROM users
             WHERE LOWER(username) = LOWER($1)
             LIMIT 1
@@ -485,7 +1082,8 @@ app.post("/api/auth/login", async (req, res) => {
         req.session.user = {
             id: user.id,
             username: user.username,
-            role: user.role
+            role: user.role,
+            avatar_url: user.avatar_url || null
         };
 
         res.json({
@@ -653,6 +1251,155 @@ app.post(
         }
     }
 );
+
+
+
+/* =========================================================
+   ARIZONA CIVIL — USER ROLE MANAGEMENT
+========================================================= */
+
+app.get(
+    "/api/roles/assignable",
+    requireAuth,
+    async (req, res) => {
+
+        const actorRole =
+            req.session?.user?.role ||
+            "Пользователь";
+
+        if (!canManageUserRoles(actorRole)) {
+
+            return res.status(403).json({
+                error:
+                    "Недостаточно прав"
+            });
+
+        }
+
+        res.json([
+            "Лидер",
+            "Заместитель"
+        ]);
+
+    }
+);
+
+
+app.patch(
+    "/api/users/:id/role-assignment",
+    requireAuth,
+    async (req, res) => {
+
+        const actorRole =
+            req.session?.user?.role ||
+            "Пользователь";
+
+        const targetRole =
+            String(
+                req.body.role || ""
+            ).trim();
+
+        const targetId =
+            Number(req.params.id);
+
+        if (!canAssignRole(
+            actorRole,
+            targetRole
+        )) {
+
+            return res.status(403).json({
+                error:
+                    "Эта роль недоступна для назначения"
+            });
+
+        }
+
+        if (!Number.isFinite(targetId)) {
+
+            return res.status(400).json({
+                error:
+                    "Некорректный ID пользователя"
+            });
+
+        }
+
+        try {
+
+            const result =
+                await query(
+                    `
+                    UPDATE users
+                    SET role = $1
+                    WHERE id = $2
+                    RETURNING
+                        id,
+                        username,
+                        name,
+                        position,
+                        role,
+                        active
+                    `,
+                    [
+                        targetRole,
+                        targetId
+                    ]
+                );
+
+            if (!result.rows.length) {
+
+                return res.status(404).json({
+                    error:
+                        "Пользователь не найден"
+                });
+
+            }
+
+            const user =
+                result.rows[0];
+
+            await audit(
+                req.session.user.username,
+                "Изменена роль пользователя",
+                `${user.username}: ${targetRole}`,
+                user.id
+            );
+
+            res.json(user);
+
+        } catch (error) {
+
+            console.error(
+                "Ошибка назначения роли:",
+                error
+            );
+
+            res.status(500).json({
+                error:
+                    "Ошибка сервера"
+            });
+
+        }
+
+    }
+);
+
+
+app.get(
+    "/api/roles",
+    requireAuth,
+    (req, res) => {
+
+        res.json({
+            roles: FINAL_ROLE_LEVEL,
+            assignable: [
+                "Лидер",
+                "Заместитель"
+            ]
+        });
+
+    }
+);
+
 
 app.patch(
     "/api/users/:id/role",
@@ -1080,6 +1827,147 @@ app.post(
  CHANGE DAYS
 =========================================
 */
+
+
+app.put(
+    "/api/leaders/:id",
+    requireRole(ROLES.ZGS_CIVIL),
+    async (req, res) => {
+
+        const id = Number(req.params.id);
+        const {
+            structure,
+            leader,
+            vk,
+            start_date,
+            end_date
+        } = req.body;
+
+        if (!structure || !leader || !start_date || !end_date) {
+            return res.status(400).json({
+                error: "Заполните обязательные поля"
+            });
+        }
+
+        if (!ORGANIZATIONS.includes(structure)) {
+            return res.status(400).json({
+                error: "Неизвестная организация"
+            });
+        }
+
+        if (end_date < start_date) {
+            return res.status(400).json({
+                error: "Дата окончания не может быть раньше даты начала"
+            });
+        }
+
+        try {
+            const oldResult = await query(
+                `
+                SELECT
+                    id,
+                    organization,
+                    name,
+                    nickname,
+                    avatar_url
+                FROM leaders
+                WHERE id = $1
+                `,
+                [id]
+            );
+
+            if (oldResult.rows.length === 0) {
+                return res.status(404).json({
+                    error: "Лидер не найден"
+                });
+            }
+
+            const oldLeader = oldResult.rows[0];
+
+            let avatarUrl = oldLeader.avatar_url || null;
+            let savedVk = vk || "";
+
+            if (vk && vk !== oldLeader.nickname) {
+                const vkProfile = await getVkProfile(vk);
+
+                if (vkProfile) {
+                    avatarUrl =
+                        vkProfile.avatar_url || null;
+
+                    savedVk =
+                        vkProfile.screen_name || vk;
+                }
+            }
+
+            const result = await query(
+                `
+                UPDATE leaders
+                SET
+                    organization = $1,
+                    name = $2,
+                    nickname = $3,
+                    start_date = $4,
+                    end_date = $5,
+                    avatar_url = $6,
+                    updated_at = NOW()
+                WHERE id = $7
+                RETURNING
+                    id,
+                    organization AS structure,
+                    name AS leader,
+                    nickname AS vk,
+                    position,
+                    start_date,
+                    end_date,
+                    status,
+                    avatar_url
+                `,
+                [
+                    structure,
+                    leader,
+                    savedVk,
+                    start_date,
+                    end_date,
+                    avatarUrl,
+                    id
+                ]
+            );
+
+            const item = result.rows[0];
+
+            await audit(
+                req.session.user.username,
+                "Изменение лидера",
+                `${structure}: ${leader}`,
+                id
+            );
+
+            res.json(item);
+
+        } catch (error) {
+            console.error(
+                "Ошибка изменения лидера:",
+                error
+            );
+
+            if (
+                error.code === "23505" &&
+                error.constraint ===
+                    "unique_active_leader_per_organization"
+            ) {
+                return res.status(409).json({
+                    error:
+                        `В организации «${structure}» уже назначен активный лидер.`
+                });
+            }
+
+            res.status(500).json({
+                error: "Ошибка сервера"
+            });
+        }
+    }
+);
+
 
 app.post(
     "/api/leaders/:id/days",
@@ -1667,6 +2555,9 @@ app.get(
                     name,
                     role,
                     position,
+                    supervisor_id,
+                    vk,
+                    avatar_url,
                     created_at,
                     updated_at
                 FROM supervisors
@@ -1679,6 +2570,364 @@ app.get(
 
             console.error(
                 "Ошибка получения следящих:",
+                error
+            );
+
+            res.status(500).json({
+                error: "Ошибка сервера"
+            });
+        }
+    }
+);
+
+
+/* =========================================================
+   ARIZONA_CIVIL_201_ASSISTANT_API
+========================================================= */
+
+/*
+    Помощник всегда:
+    role = Помощник следящего
+    position =
+    Помощник следящего за гражданской структурой
+*/
+
+app.get(
+    "/api/supervisors/assistants",
+    requireAuth,
+    async (req, res) => {
+
+        try {
+
+            const result = await query(`
+                SELECT
+                    id,
+                    name,
+                    role,
+                    position,
+                    supervisor_id,
+                    vk,
+                    avatar_url,
+                    created_at,
+                    updated_at
+                FROM supervisors
+                WHERE role = $1
+                ORDER BY name
+            `, [
+                ROLES.ASSISTANT
+            ]);
+
+            res.json(result.rows);
+
+        } catch (error) {
+
+            console.error(
+                "Ошибка получения помощников:",
+                error
+            );
+
+            res.status(500).json({
+                error: "Ошибка сервера"
+            });
+        }
+    }
+);
+
+
+app.post(
+    "/api/supervisors/assistants",
+    requireRole(ROLES.FOLLOWER),
+    async (req, res) => {
+
+        const name =
+            String(req.body.name || "").trim();
+
+        const supervisorId =
+            Number(req.body.supervisor_id);
+
+        const vk =
+            String(req.body.vk || "").trim();
+
+        const avatarUrl =
+            String(req.body.avatar_url || "").trim();
+
+        if (!name) {
+            return res.status(400).json({
+                error: "Введите имя или ник"
+            });
+        }
+
+        if (!supervisorId) {
+            return res.status(400).json({
+                error: "Не выбран следящий"
+            });
+        }
+
+        try {
+
+            const owner = await query(
+                `
+                    SELECT id, name
+                    FROM supervisors
+                    WHERE id = $1
+                    AND role = $2
+                `,
+                [
+                    supervisorId,
+                    ROLES.FOLLOWER
+                ]
+            );
+
+            if (!owner.rows.length) {
+
+                return res.status(400).json({
+                    error:
+                        "Помощник может быть привязан только к следящему"
+                });
+            }
+
+            const id =
+                Date.now() +
+                Math.floor(Math.random() * 1000);
+
+            const result = await query(
+                `
+                    INSERT INTO supervisors
+                    (
+                        id,
+                        name,
+                        role,
+                        position,
+                        supervisor_id,
+                        vk,
+                        avatar_url,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES
+                    (
+                        $1,
+                        $2,
+                        $3,
+                        $4,
+                        $5,
+                        $6,
+                        $7,
+                        NOW(),
+                        NOW()
+                    )
+                    RETURNING
+                        id,
+                        name,
+                        role,
+                        position,
+                        supervisor_id,
+                        vk,
+                        avatar_url,
+                        created_at,
+                        updated_at
+                `,
+                [
+                    id,
+                    name,
+                    ROLES.ASSISTANT,
+                    "Помощник следящего за гражданской структурой",
+                    supervisorId,
+                    vk || null,
+                    avatarUrl || null
+                ]
+            );
+
+            await audit(
+                req.session.user.username,
+                "Добавлен помощник следящего",
+                name,
+                id
+            );
+
+            res.json(result.rows[0]);
+
+        } catch (error) {
+
+            console.error(
+                "Ошибка добавления помощника:",
+                error
+            );
+
+            res.status(500).json({
+                error: "Ошибка сервера"
+            });
+        }
+    }
+);
+
+
+app.patch(
+    "/api/supervisors/assistants/:id",
+    requireRole(ROLES.FOLLOWER),
+    async (req, res) => {
+
+        const id =
+            Number(req.params.id);
+
+        const name =
+            String(req.body.name || "").trim();
+
+        const supervisorId =
+            Number(req.body.supervisor_id);
+
+        const vk =
+            String(req.body.vk || "").trim();
+
+        const avatarUrl =
+            String(req.body.avatar_url || "").trim();
+
+        if (!name || !supervisorId) {
+
+            return res.status(400).json({
+                error:
+                    "Имя и следящий обязательны"
+            });
+        }
+
+        try {
+
+            const owner = await query(
+                `
+                    SELECT id
+                    FROM supervisors
+                    WHERE id = $1
+                    AND role = $2
+                `,
+                [
+                    supervisorId,
+                    ROLES.FOLLOWER
+                ]
+            );
+
+            if (!owner.rows.length) {
+
+                return res.status(400).json({
+                    error:
+                        "Следящий не найден"
+                });
+            }
+
+            const result = await query(
+                `
+                    UPDATE supervisors
+
+                    SET
+                        name = $1,
+                        position = $2,
+                        supervisor_id = $3,
+                        vk = $4,
+                        avatar_url = $5,
+                        updated_at = NOW()
+
+                    WHERE id = $6
+                    AND role = $7
+
+                    RETURNING
+                        id,
+                        name,
+                        role,
+                        position,
+                        supervisor_id,
+                        vk,
+                        avatar_url,
+                        created_at,
+                        updated_at
+                `,
+                [
+                    name,
+                    "Помощник следящего за гражданской структурой",
+                    supervisorId,
+                    vk || null,
+                    avatarUrl || null,
+                    id,
+                    ROLES.ASSISTANT
+                ]
+            );
+
+            if (!result.rows.length) {
+
+                return res.status(404).json({
+                    error:
+                        "Помощник не найден"
+                });
+            }
+
+            await audit(
+                req.session.user.username,
+                "Изменён помощник следящего",
+                name,
+                id
+            );
+
+            res.json(result.rows[0]);
+
+        } catch (error) {
+
+            console.error(
+                "Ошибка изменения помощника:",
+                error
+            );
+
+            res.status(500).json({
+                error: "Ошибка сервера"
+            });
+        }
+    }
+);
+
+
+app.delete(
+    "/api/supervisors/assistants/:id",
+    requireRole(ROLES.FOLLOWER),
+    async (req, res) => {
+
+        try {
+
+            const result = await query(
+                `
+                    DELETE FROM supervisors
+                    WHERE id = $1
+                    AND role = $2
+
+                    RETURNING
+                        id,
+                        name
+                `,
+                [
+                    Number(req.params.id),
+                    ROLES.ASSISTANT
+                ]
+            );
+
+            if (!result.rows.length) {
+
+                return res.status(404).json({
+                    error:
+                        "Помощник не найден"
+                });
+            }
+
+            await audit(
+                req.session.user.username,
+                "Удалён помощник следящего",
+                result.rows[0].name,
+                result.rows[0].id
+            );
+
+            res.json({
+                success: true
+            });
+
+        } catch (error) {
+
+            console.error(
+                "Ошибка удаления помощника:",
                 error
             );
 
@@ -1919,6 +3168,338 @@ app.delete(
 =========================================
 */
 
+
+/*
+=========================================================
+ ARIZONA CIVIL 2.0
+ SUPERVISOR ASSISTANTS API
+=========================================================
+*/
+
+app.get(
+    "/api/supervisor-assistants",
+    requireAuth,
+    async (req, res) => {
+        try {
+            const result = await query(`
+                SELECT
+                    a.id,
+                    a.supervisor_id,
+                    a.name,
+                    a.role,
+                    a.position,
+                    a.vk,
+                    a.avatar_url,
+                    a.created_at,
+                    a.updated_at,
+                    s.name AS supervisor_name
+                FROM supervisor_assistants a
+                LEFT JOIN supervisors s
+                    ON s.id = a.supervisor_id
+                ORDER BY a.name
+            `);
+
+            res.json(result.rows);
+
+        } catch (error) {
+            console.error(
+                "Ошибка получения помощников следящих:",
+                error
+            );
+
+            res.status(500).json({
+                error: "Ошибка сервера"
+            });
+        }
+    }
+);
+
+app.post(
+    "/api/supervisor-assistants",
+    requireRole(ROLES.ZGS_CIVIL),
+    async (req, res) => {
+
+        const name =
+            String(req.body.name || "").trim();
+
+        const position =
+            String(
+                req.body.position ||
+                "Помощник следящего"
+            ).trim();
+
+        const vk =
+            String(req.body.vk || "").trim();
+
+        const avatar_url =
+            String(req.body.avatar_url || "").trim();
+
+        const supervisorId =
+            req.body.supervisor_id
+                ? Number(req.body.supervisor_id)
+                : null;
+
+        if (!name) {
+            return res.status(400).json({
+                error: "Введите имя или ник"
+            });
+        }
+
+        if (!supervisorId) {
+            return res.status(400).json({
+                error: "Выберите следящего"
+            });
+        }
+
+        try {
+
+            const supervisorResult = await query(
+                `
+                SELECT id, name
+                FROM supervisors
+                WHERE id = $1
+                `,
+                [supervisorId]
+            );
+
+            if (!supervisorResult.rows.length) {
+                return res.status(404).json({
+                    error: "Следящий не найден"
+                });
+            }
+
+            const id =
+                Date.now() +
+                Math.floor(Math.random() * 1000);
+
+            const result = await query(
+                `
+                INSERT INTO supervisor_assistants
+                (
+                    id,
+                    supervisor_id,
+                    name,
+                    role,
+                    position,
+                    vk,
+                    avatar_url,
+                    created_at,
+                    updated_at
+                )
+                VALUES
+                (
+                    $1,
+                    $2,
+                    $3,
+                    $4,
+                    $5,
+                    $6,
+                    $7,
+                    NOW(),
+                    NOW()
+                )
+                RETURNING
+                    id,
+                    supervisor_id,
+                    name,
+                    role,
+                    position,
+                    vk,
+                    avatar_url,
+                    created_at,
+                    updated_at
+                `,
+                [
+                    id,
+                    supervisorId,
+                    name,
+                    "Помощник следящего",
+                    position,
+                    vk,
+                    avatar_url
+                ]
+            );
+
+            await audit(
+                req.session.user.username,
+                "Добавлен помощник следящего",
+                `${name}: ${position}`,
+                id
+            );
+
+            res.json(result.rows[0]);
+
+        } catch (error) {
+
+            console.error(
+                "Ошибка добавления помощника:",
+                error
+            );
+
+            res.status(500).json({
+                error: "Ошибка сервера"
+            });
+        }
+    }
+);
+
+app.patch(
+    "/api/supervisor-assistants/:id",
+    requireRole(ROLES.ZGS_CIVIL),
+    async (req, res) => {
+
+        const id =
+            Number(req.params.id);
+
+        const name =
+            String(req.body.name || "").trim();
+
+        const position =
+            String(
+                req.body.position ||
+                "Помощник следящего"
+            ).trim();
+
+        const vk =
+            String(req.body.vk || "").trim();
+
+        const avatar_url =
+            String(req.body.avatar_url || "").trim();
+
+        const supervisorId =
+            req.body.supervisor_id
+                ? Number(req.body.supervisor_id)
+                : null;
+
+        if (!name) {
+            return res.status(400).json({
+                error: "Введите имя или ник"
+            });
+        }
+
+        if (!supervisorId) {
+            return res.status(400).json({
+                error: "Выберите следящего"
+            });
+        }
+
+        try {
+
+            const result = await query(
+                `
+                UPDATE supervisor_assistants
+                SET
+                    supervisor_id = $1,
+                    name = $2,
+                    position = $3,
+                    vk = $4,
+                    avatar_url = $5,
+                    updated_at = NOW()
+                WHERE id = $6
+                RETURNING
+                    id,
+                    supervisor_id,
+                    name,
+                    role,
+                    position,
+                    vk,
+                    avatar_url,
+                    created_at,
+                    updated_at
+                `,
+                [
+                    supervisorId,
+                    name,
+                    position,
+                    vk,
+                    avatar_url,
+                    id
+                ]
+            );
+
+            if (!result.rows.length) {
+                return res.status(404).json({
+                    error: "Помощник не найден"
+                });
+            }
+
+            await audit(
+                req.session.user.username,
+                "Изменён помощник следящего",
+                `${name}: ${position}`,
+                id
+            );
+
+            res.json(result.rows[0]);
+
+        } catch (error) {
+
+            console.error(
+                "Ошибка изменения помощника:",
+                error
+            );
+
+            res.status(500).json({
+                error: "Ошибка сервера"
+            });
+        }
+    }
+);
+
+app.delete(
+    "/api/supervisor-assistants/:id",
+    requireRole(ROLES.ZGS_CIVIL),
+    async (req, res) => {
+
+        const id =
+            Number(req.params.id);
+
+        try {
+
+            const result = await query(
+                `
+                DELETE FROM supervisor_assistants
+                WHERE id = $1
+                RETURNING id, name, position
+                `,
+                [id]
+            );
+
+            if (!result.rows.length) {
+                return res.status(404).json({
+                    error: "Помощник не найден"
+                });
+            }
+
+            const assistant =
+                result.rows[0];
+
+            await audit(
+                req.session.user.username,
+                "Удалён помощник следящего",
+                `${assistant.name}: ${assistant.position}`,
+                id
+            );
+
+            res.json({
+                success: true
+            });
+
+        } catch (error) {
+
+            console.error(
+                "Ошибка удаления помощника:",
+                error
+            );
+
+            res.status(500).json({
+                error: "Ошибка сервера"
+            });
+        }
+    }
+);
+
+
 app.get(
     "/api/journal",
     requireAuth,
@@ -2013,12 +3594,60 @@ app.use((req, res) => {
     );
 });
 
+
+/* =========================================================
+   ARIZONA_CIVIL_201_MIGRATION
+========================================================= */
+
+async function initArizonaCivil201() {
+    await query(`
+        ALTER TABLE supervisors
+        ADD COLUMN IF NOT EXISTS supervisor_id BIGINT
+    `);
+
+    await query(`
+        ALTER TABLE supervisors
+        ADD COLUMN IF NOT EXISTS vk TEXT
+    `);
+
+    await query(`
+        ALTER TABLE supervisors
+        ADD COLUMN IF NOT EXISTS avatar_url TEXT
+    `);
+
+    await query(`
+        ALTER TABLE supervisors
+        ADD COLUMN IF NOT EXISTS updated_at
+        TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    `);
+
+    await query(`
+        CREATE INDEX IF NOT EXISTS
+        idx_supervisors_supervisor_id
+        ON supervisors(supervisor_id)
+    `);
+
+    console.log("✅ Arizona Civil 2.0.1: миграция БД завершена");
+}
+
 async function startServer() {
 
     try {
+        
         await initDatabase();
+        if (typeof initDatabaseV30 === 'function') await initDatabaseV30();
 
-        app.listen(PORT, () => {
+        if (
+            typeof initArizonaCivil201 ===
+            "function"
+        ) {
+            await initArizonaCivil201();
+        }
+        
+        await initArizonaCivil201();
+        await initSupervisorV2();
+
+        app.listen(PORT, "0.0.0.0", () => {
 
             console.log("");
             console.log("================================");
@@ -2039,3 +3668,369 @@ async function startServer() {
 }
 
 startServer();
+
+/* =========================================================
+   ARIZONA_CIVIL_RENDER_SHUTDOWN
+========================================================= */
+
+function shutdown(signal) {
+
+    console.log(
+        `Получен ${signal}. Завершение...`
+    );
+
+    pool.end()
+        .catch(() => {})
+        .finally(() => {
+
+            process.exit(0);
+
+        });
+
+}
+
+process.on(
+    "SIGTERM",
+    () => shutdown("SIGTERM")
+);
+
+process.on(
+    "SIGINT",
+    () => shutdown("SIGINT")
+);
+
+
+
+/*
+=========================================================
+ ARIZONA CIVIL 2.2 — GRACEFUL SHUTDOWN
+=========================================================
+*/
+
+async function gracefulShutdown(signal) {
+    console.log(`Получен ${signal}. Завершение работы...`);
+
+    try {
+        await pool.end();
+        console.log("PostgreSQL connection pool закрыт");
+    } catch (error) {
+        console.error("Ошибка закрытия PostgreSQL:", error.message);
+    }
+
+    process.exit(0);
+}
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+
+
+
+/*
+=========================================================
+ ARIZONA CIVIL 3.0 — PERSONNEL CENTER API
+=========================================================
+*/
+
+app.get("/api/v3/dashboard", requireAuth, async (req, res) => {
+    try {
+
+        const users = await query(`
+            SELECT
+                COUNT(*)::int AS total,
+                COUNT(*) FILTER (
+                    WHERE active = TRUE
+                )::int AS active
+            FROM users
+        `);
+
+        const roles = await query(`
+            SELECT role, COUNT(*)::int AS count
+            FROM users
+            GROUP BY role
+            ORDER BY count DESC
+        `);
+
+        const organizations = await query(`
+            SELECT
+                organization,
+                COUNT(*)::int AS count
+            FROM users
+            WHERE organization IS NOT NULL
+              AND organization <> ''
+            GROUP BY organization
+            ORDER BY count DESC
+        `);
+
+        const appointments = await query(`
+            SELECT COUNT(*)::int AS count
+            FROM appointments
+            WHERE active = TRUE
+        `);
+
+        res.json({
+            version: "3.0",
+            users: users.rows[0],
+            roles: roles.rows,
+            organizations: organizations.rows,
+            appointments: appointments.rows[0]
+        });
+
+    } catch (error) {
+
+        console.error("Dashboard V3:", error);
+
+        res.status(500).json({
+            error: "Ошибка dashboard"
+        });
+    }
+});
+
+
+app.get(
+    "/api/v3/personnel",
+    requireAuth,
+    async (req, res) => {
+
+        try {
+
+            const search =
+                String(req.query.search || "").trim();
+
+            const role =
+                String(req.query.role || "").trim();
+
+            const organization =
+                String(req.query.organization || "").trim();
+
+            const result = await query(
+                `
+                SELECT
+                    id,
+                    username,
+                    name,
+                    role,
+                    position,
+                    organization,
+                    vk,
+                    avatar_url,
+                    active,
+                    appointed_at,
+                    appointed_by,
+                    created_at
+                FROM users
+                WHERE
+                    (
+                        $1 = ''
+                        OR username ILIKE '%' || $1 || '%'
+                        OR name ILIKE '%' || $1 || '%'
+                    )
+                    AND ($2 = '' OR role = $2)
+                    AND (
+                        $3 = ''
+                        OR organization = $3
+                    )
+                ORDER BY
+                    CASE role
+                        WHEN 'Разработчик' THEN 1
+                        WHEN 'ГС ГОС' THEN 2
+                        WHEN 'ЗГС ГОС' THEN 3
+                        WHEN 'ГС гражданских' THEN 4
+                        WHEN 'ЗГС гражданских' THEN 5
+                        WHEN 'Следящий' THEN 6
+                        WHEN 'Помощник следящего за гражданской структурой' THEN 7
+                        WHEN 'Лидер' THEN 8
+                        WHEN 'Заместитель' THEN 9
+                        ELSE 10
+                    END,
+                    username
+                `,
+                [
+                    search,
+                    role,
+                    organization
+                ]
+            );
+
+            res.json(result.rows);
+
+        } catch (error) {
+
+            console.error(
+                "Personnel V3:",
+                error
+            );
+
+            res.status(500).json({
+                error: "Ошибка получения персонала"
+            });
+        }
+    }
+);
+
+
+app.get(
+    "/api/v3/personnel/:id",
+    requireAuth,
+    async (req, res) => {
+
+        try {
+
+            const userResult = await query(
+                `
+                SELECT
+                    id,
+                    username,
+                    name,
+                    role,
+                    position,
+                    organization,
+                    vk,
+                    avatar_url,
+                    active,
+                    appointed_at,
+                    appointed_by,
+                    created_at
+                FROM users
+                WHERE id = $1
+                `,
+                [Number(req.params.id)]
+            );
+
+            if (!userResult.rows.length) {
+                return res.status(404).json({
+                    error: "Сотрудник не найден"
+                });
+            }
+
+            const history = await query(
+                `
+                SELECT
+                    action,
+                    details,
+                    actor,
+                    created_at
+                FROM personnel_history
+                WHERE user_id = $1
+                ORDER BY created_at DESC
+                LIMIT 100
+                `,
+                [Number(req.params.id)]
+            );
+
+            const appointments = await query(
+                `
+                SELECT
+                    role,
+                    organization,
+                    appointed_by,
+                    start_date,
+                    end_date,
+                    active
+                FROM appointments
+                WHERE user_id = $1
+                ORDER BY start_date DESC
+                `,
+                [Number(req.params.id)]
+            );
+
+            res.json({
+                user: userResult.rows[0],
+                history: history.rows,
+                appointments: appointments.rows
+            });
+
+        } catch (error) {
+
+            console.error(
+                "Personnel profile:",
+                error
+            );
+
+            res.status(500).json({
+                error: "Ошибка профиля"
+            });
+        }
+    }
+);
+
+
+app.get(
+    "/api/v3/organizations",
+    requireAuth,
+    async (req, res) => {
+
+        try {
+
+            const result = await query(`
+                SELECT
+                    o.*,
+                    COUNT(u.id)::int AS personnel_count
+                FROM organizations o
+                LEFT JOIN users u
+                    ON u.organization = o.name
+                GROUP BY o.id
+                ORDER BY o.name
+            `);
+
+            res.json(result.rows);
+
+        } catch (error) {
+
+            console.error(
+                "Organizations V3:",
+                error
+            );
+
+            res.status(500).json({
+                error: "Ошибка организаций"
+            });
+        }
+    }
+);
+
+
+app.get(
+    "/api/v3/audit",
+    requireAuth,
+    async (req, res) => {
+
+        try {
+
+            const result = await query(`
+                SELECT
+                    id,
+                    actor,
+                    action,
+                    details,
+                    target_user_id,
+                    created_at
+                FROM audit_log
+                ORDER BY created_at DESC
+                LIMIT 200
+            `);
+
+            res.json(result.rows);
+
+        } catch (error) {
+
+            console.error(
+                "Audit V3:",
+                error
+            );
+
+            res.status(500).json({
+                error: "Ошибка журнала"
+            });
+        }
+    }
+);
+
+
+app.get("/api/version", (req, res) => {
+    res.json({
+        name: "Arizona Civil",
+        version: "3.0",
+        status: "production-ready"
+    });
+});
+

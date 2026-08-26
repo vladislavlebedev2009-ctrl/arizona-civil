@@ -4,8 +4,12 @@
   "description": "Панель гражданских структур Arizona RP",
   "main": "server.js",
   "scripts": {
-    "start": "node init-admin.js && node server.js",
-    "render-check": "node prepare-render.js"
+    "start": "node server.js",
+    "render-check": "node prepare-render.js",
+    "dev": "node server.js",
+    "check": "node --check server.js && node --check db.js && node --check permissions.js",
+    "start:prod": "NODE_ENV=production node server.js",
+    "db:migrate": "node db.js"
   },
   "dependencies": {
     "connect-pg-simple": "^10.0.0",
