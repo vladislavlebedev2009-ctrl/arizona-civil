@@ -11,3 +11,5 @@ public.backup/
 server.backup.js
 server.before-env.js
 package.before-admin.json
+
+backup-before-render/

@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: arizona-civil
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: DATABASE_URL
+        sync: false

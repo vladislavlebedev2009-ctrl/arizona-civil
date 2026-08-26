@@ -1,8 +1,10 @@
+require('dotenv').config();
 const express = require("express");
 const session = require("express-session");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { initDatabase, query } = require("./db");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -27,6 +29,7 @@ const ORGANIZATIONS = [
 ];
 
 const ROLES = {
+    USER: "Пользователь",
     DEVELOPER: "Разработчик",
     GS_GOS: "ГС ГОС",
     ZGS_GOS: "ЗГС ГОС",
@@ -36,6 +39,7 @@ const ROLES = {
 };
 
 const ROLE_LEVEL = {
+    [ROLES.USER]: 0,
     [ROLES.FOLLOWER]: 10,
     [ROLES.ZGS_CIVIL]: 20,
     [ROLES.GS_CIVIL]: 30,
@@ -89,6 +93,38 @@ function hashPassword(password) {
         .createHash("sha256")
         .update(password)
         .digest("hex");
+}
+
+async function audit(
+    actor,
+    action,
+    details = "",
+    targetUserId = null
+) {
+    try {
+
+        await query(
+            `
+            INSERT INTO audit_log
+                (actor, action, details, target_user_id)
+            VALUES
+                ($1, $2, $3, $4)
+            `,
+            [
+                actor,
+                action,
+                details,
+                targetUserId
+            ]
+        );
+
+    } catch (error) {
+
+        console.error(
+            "Ошибка записи аудита:",
+            error.message
+        );
+    }
 }
 
 function journal(data, actor, action, details) {
@@ -171,7 +207,8 @@ app.use(session({
 =========================================
 */
 
-app.post("/api/auth/login", (req, res) => {
+
+app.post("/api/auth/register", async (req, res) => {
 
     const {
         username,
@@ -184,47 +221,160 @@ app.post("/api/auth/login", (req, res) => {
         });
     }
 
-    const data = loadData();
+    const cleanUsername = String(username).trim();
+    const cleanPassword = String(password);
 
-    const user = data.users.find(
-        x => x.username.toLowerCase() ===
-             username.toLowerCase()
-    );
-
-    if (!user) {
-        return res.status(401).json({
-            error: "Неверный логин или пароль"
+    if (cleanUsername.length < 3 || cleanUsername.length > 30) {
+        return res.status(400).json({
+            error: "Логин должен содержать от 3 до 30 символов"
         });
     }
 
-    if (
-        user.password !==
-        hashPassword(password)
-    ) {
-        return res.status(401).json({
-            error: "Неверный логин или пароль"
+    if (cleanPassword.length < 6) {
+        return res.status(400).json({
+            error: "Пароль должен содержать минимум 6 символов"
         });
     }
 
-    req.session.user = {
-        id: user.id,
-        username: user.username,
-        role: user.role
-    };
+    try {
 
-    journal(
-        data,
-        user.username,
-        "Авторизация",
-        `Вход в систему как ${user.role}`
-    );
+        const existing = await query(
+            `
+            SELECT id
+            FROM users
+            WHERE LOWER(username) = LOWER($1)
+            LIMIT 1
+            `,
+            [cleanUsername]
+        );
 
-    saveData(data);
+        if (existing.rows.length > 0) {
+            return res.status(409).json({
+                error: "Такой пользователь уже существует"
+            });
+        }
 
-    res.json({
-        success: true,
-        user: req.session.user
-    });
+        const result = await query(
+            `
+            INSERT INTO users
+                (username, password_hash, role, active)
+            VALUES
+                ($1, $2, $3, TRUE)
+            RETURNING id, username, role, active
+            `,
+            [
+                cleanUsername,
+                hashPassword(cleanPassword),
+                ROLES.USER
+            ]
+        );
+
+        const user = result.rows[0];
+
+        console.log(
+            `Новый пользователь зарегистрирован: ${user.username}`
+        );
+
+        await audit(
+            user.username,
+            "Регистрация",
+            "Создан новый аккаунт",
+            user.id
+        );
+
+
+        res.status(201).json({
+            success: true,
+            message: "Регистрация успешно завершена",
+            user: {
+                id: user.id,
+                username: user.username,
+                role: user.role
+            }
+        });
+
+    } catch (error) {
+
+        console.error("Ошибка регистрации:", error);
+
+        res.status(500).json({
+            error: "Ошибка сервера"
+        });
+    }
+});
+
+app.post("/api/auth/login", async (req, res) => {
+
+    const {
+        username,
+        password
+    } = req.body;
+
+    if (!username || !password) {
+        return res.status(400).json({
+            error: "Введите логин и пароль"
+        });
+    }
+
+    try {
+
+        const result = await query(
+            `
+            SELECT
+                id,
+                username,
+                password_hash,
+                role,
+                active
+            FROM users
+            WHERE LOWER(username) = LOWER($1)
+            LIMIT 1
+            `,
+            [String(username).trim()]
+        );
+
+        const user = result.rows[0];
+
+        if (!user) {
+            return res.status(401).json({
+                error: "Неверный логин или пароль"
+            });
+        }
+
+        if (!user.active) {
+            return res.status(403).json({
+                error: "Аккаунт заблокирован"
+            });
+        }
+
+        if (
+            user.password_hash !==
+            hashPassword(String(password))
+        ) {
+            return res.status(401).json({
+                error: "Неверный логин или пароль"
+            });
+        }
+
+        req.session.user = {
+            id: user.id,
+            username: user.username,
+            role: user.role
+        };
+
+        res.json({
+            success: true,
+            user: req.session.user
+        });
+
+    } catch (error) {
+
+        console.error("Ошибка авторизации:", error);
+
+        res.status(500).json({
+            error: "Ошибка сервера"
+        });
+    }
 });
 
 app.post("/api/auth/logout", requireAuth, (req, res) => {
@@ -259,24 +409,40 @@ app.get("/api/auth/me", (req, res) => {
 app.get(
     "/api/users",
     requireRole(ROLES.DEVELOPER),
-    (req, res) => {
+    async (req, res) => {
 
-        const data = loadData();
+        try {
 
-        res.json(
-            data.users.map(u => ({
-                id: u.id,
-                username: u.username,
-                role: u.role
-            }))
-        );
+            const result = await query(`
+                SELECT
+                    id,
+                    username,
+                    role,
+                    name,
+                    position,
+                    active,
+                    created_at
+                FROM users
+                ORDER BY id
+            `);
+
+            res.json(result.rows);
+
+        } catch (error) {
+
+            console.error("Ошибка получения пользователей:", error);
+
+            res.status(500).json({
+                error: "Ошибка сервера"
+            });
+        }
     }
 );
 
 app.post(
     "/api/users",
     requireRole(ROLES.DEVELOPER),
-    (req, res) => {
+    async (req, res) => {
 
         const {
             username,
@@ -296,64 +462,80 @@ app.post(
             });
         }
 
-        const data = loadData();
+        const cleanUsername = String(username).trim();
 
-        if (
-            data.users.some(
-                x =>
-                    x.username.toLowerCase() ===
-                    username.toLowerCase()
-            )
-        ) {
-            return res.status(409).json({
-                error: "Такой пользователь уже существует"
+        if (cleanUsername.length < 3 || cleanUsername.length > 30) {
+            return res.status(400).json({
+                error: "Логин должен содержать от 3 до 30 символов"
             });
         }
 
-        const user = {
-            id: Date.now(),
-            username,
-            password: hashPassword(password),
-            role
-        };
+        if (String(password).length < 6) {
+            return res.status(400).json({
+                error: "Пароль должен содержать минимум 6 символов"
+            });
+        }
 
-        data.users.push(user);
+        try {
 
-        journal(
-            data,
-            req.session.user.username,
-            "Создание пользователя",
-            `${username} — ${role}`
-        );
+            const existing = await query(
+                `
+                SELECT id
+                FROM users
+                WHERE LOWER(username) = LOWER($1)
+                LIMIT 1
+                `,
+                [cleanUsername]
+            );
 
-        saveData(data);
+            if (existing.rows.length > 0) {
+                return res.status(409).json({
+                    error: "Такой пользователь уже существует"
+                });
+            }
 
-        res.json({
-            id: user.id,
-            username: user.username,
-            role: user.role
-        });
+            const result = await query(
+                `
+                INSERT INTO users
+                    (username, password_hash, role, active)
+                VALUES
+                    ($1, $2, $3, TRUE)
+                RETURNING id, username, role, active
+                `,
+                [
+                    cleanUsername,
+                    hashPassword(String(password)),
+                    role
+                ]
+            );
+
+            const user = result.rows[0];
+
+            console.log(
+                `Разработчик ${req.session.user.username} создал пользователя ${user.username}`
+            );
+
+            res.status(201).json(user);
+
+        } catch (error) {
+
+            console.error("Ошибка создания пользователя:", error);
+
+            res.status(500).json({
+                error: "Ошибка сервера"
+            });
+        }
     }
 );
 
 app.patch(
     "/api/users/:id/role",
     requireRole(ROLES.DEVELOPER),
-    (req, res) => {
+    async (req, res) => {
 
-        const data = loadData();
-
-        const user = data.users.find(
-            x => x.id === Number(req.params.id)
-        );
-
-        if (!user) {
-            return res.status(404).json({
-                error: "Пользователь не найден"
-            });
-        }
-
-        const { role } = req.body;
+        const {
+            role
+        } = req.body;
 
         if (!Object.values(ROLES).includes(role)) {
             return res.status(400).json({
@@ -361,20 +543,170 @@ app.patch(
             });
         }
 
-        user.role = role;
+        try {
 
-        journal(
-            data,
-            req.session.user.username,
-            "Изменение роли",
-            `${user.username} → ${role}`
-        );
+            const existing = await query(
+                `
+                SELECT id, username, role
+                FROM users
+                WHERE id = $1
+                `,
+                [Number(req.params.id)]
+            );
 
-        saveData(data);
+            if (existing.rows.length === 0) {
+                return res.status(404).json({
+                    error: "Пользователь не найден"
+                });
+            }
 
-        res.json({
-            success: true
-        });
+            const oldRole = existing.rows[0].role;
+
+            const result = await query(
+                `
+                UPDATE users
+                SET role = $1
+                WHERE id = $2
+                RETURNING id, username, role, active
+                `,
+                [
+                    role,
+                    Number(req.params.id)
+                ]
+            );
+
+            const user = result.rows[0];
+
+            console.log(
+                `Разработчик ${req.session.user.username}: ${user.username} — ${oldRole} → ${role}`
+            );
+
+            await audit(
+                req.session.user.username,
+                "Изменение роли",
+                `${user.username}: ${oldRole} → ${role}`,
+                user.id
+            );
+
+
+            res.json({
+                success: true,
+                user
+            });
+
+        } catch (error) {
+
+            console.error("Ошибка изменения роли:", error);
+
+            res.status(500).json({
+                error: "Ошибка сервера"
+            });
+        }
+    }
+);
+
+
+app.patch(
+    "/api/users/:id/status",
+    requireRole(ROLES.DEVELOPER),
+    async (req, res) => {
+
+        const { active } = req.body;
+
+        if (typeof active !== "boolean") {
+            return res.status(400).json({
+                error: "Поле active должно быть true или false"
+            });
+        }
+
+        const userId = Number(req.params.id);
+
+        if (!Number.isInteger(userId)) {
+            return res.status(400).json({
+                error: "Некорректный ID пользователя"
+            });
+        }
+
+        try {
+
+            const existing = await query(
+                `
+                SELECT id, username, role, active
+                FROM users
+                WHERE id = $1
+                `,
+                [userId]
+            );
+
+            if (existing.rows.length === 0) {
+                return res.status(404).json({
+                    error: "Пользователь не найден"
+                });
+            }
+
+            const target = existing.rows[0];
+
+            /*
+             * Разработчик не может заблокировать
+             * сам себя.
+             */
+            if (
+                target.id ===
+                Number(req.session.user.id)
+            ) {
+                return res.status(400).json({
+                    error: "Нельзя изменить статус собственного аккаунта"
+                });
+            }
+
+            const result = await query(
+                `
+                UPDATE users
+                SET active = $1
+                WHERE id = $2
+                RETURNING id, username, role, active
+                `,
+                [active, userId]
+            );
+
+            const user = result.rows[0];
+
+            console.log(
+                `Статус пользователя ${user.username}: ` +
+                `${target.active ? "активен" : "заблокирован"} → ` +
+                `${active ? "активен" : "заблокирован"}`
+            );
+
+            await audit(
+                req.session.user.username,
+                active
+                    ? "Разблокировка"
+                    : "Блокировка",
+                `${user.username}: ${
+                    active
+                        ? "активен"
+                        : "заблокирован"
+                }`,
+                user.id
+            );
+
+
+            res.json({
+                success: true,
+                user
+            });
+
+        } catch (error) {
+
+            console.error(
+                "Ошибка изменения статуса пользователя:",
+                error
+            );
+
+            res.status(500).json({
+                error: "Ошибка сервера"
+            });
+        }
     }
 );
 
@@ -448,24 +780,43 @@ app.get(
 app.get(
     "/api/leaders",
     requireAuth,
-    (req, res) => {
+    async (req, res) => {
 
-        const data = loadData();
+        try {
 
-        res.json(
-            data.leaders.sort(
-                (a, b) =>
-                    new Date(a.end_date) -
-                    new Date(b.end_date)
-            )
-        );
+            const result = await query(`
+                SELECT
+                    id,
+                    organization AS structure,
+                    name AS leader,
+                    nickname AS vk,
+                    start_date,
+                    end_date,
+                    status
+                FROM leaders
+                ORDER BY end_date ASC
+            `);
+
+            res.json(result.rows);
+
+        } catch (error) {
+
+            console.error(
+                "Ошибка получения лидеров:",
+                error
+            );
+
+            res.status(500).json({
+                error: "Ошибка сервера"
+            });
+        }
     }
 );
 
 app.post(
     "/api/leaders",
     requireRole(ROLES.ZGS_CIVIL),
-    (req, res) => {
+    async (req, res) => {
 
         const {
             structure,
@@ -492,30 +843,76 @@ app.post(
             });
         }
 
-        const data = loadData();
+        try {
 
-        const item = {
-            id: Date.now(),
-            structure,
-            leader,
-            vk: vk || "",
-            start_date,
-            end_date,
-            status: "Активен"
-        };
+            const id = Date.now();
 
-        data.leaders.push(item);
+            const result = await query(
+                `
+                INSERT INTO leaders
+                    (
+                        id,
+                        organization,
+                        name,
+                        nickname,
+                        start_date,
+                        end_date,
+                        status
+                    )
+                VALUES
+                    ($1, $2, $3, $4, $5, $6, 'Активен')
+                RETURNING
+                    id,
+                    organization AS structure,
+                    name AS leader,
+                    nickname AS vk,
+                    start_date,
+                    end_date,
+                    status
+                `,
+                [
+                    id,
+                    structure,
+                    leader,
+                    vk || "",
+                    start_date,
+                    end_date
+                ]
+            );
 
-        journal(
-            data,
-            req.session.user.username,
-            "Добавление лидера",
-            `${structure}: ${leader}`
-        );
+            const item = result.rows[0];
 
-        saveData(data);
+            await audit(
+                req.session.user.username,
+                "Добавление лидера",
+                `${structure}: ${leader}`,
+                id
+            );
 
-        res.json(item);
+            res.json(item);
+
+        } catch (error) {
+
+            console.error(
+                "Ошибка добавления лидера:",
+                error
+            );
+
+            // PostgreSQL: в организации уже есть активный лидер
+            if (error.code === "23505" &&
+                error.constraint === "unique_active_leader_per_organization") {
+
+                return res.status(409).json({
+                    error:
+                        `В организации «${structure}» уже назначен активный лидер. ` +
+                        `Сначала удалите текущего лидера или дождитесь окончания его срока.`
+                });
+            }
+
+            res.status(500).json({
+                error: "Ошибка сервера"
+            });
+        }
     }
 );
 
@@ -528,7 +925,7 @@ app.post(
 app.post(
     "/api/leaders/:id/days",
     requireRole(ROLES.ZGS_CIVIL),
-    (req, res) => {
+    async (req, res) => {
 
         const amount = Number(req.body.days);
 
@@ -538,46 +935,81 @@ app.post(
             });
         }
 
-        const data = loadData();
+        try {
 
-        const leader =
-            findLeader(data, req.params.id);
+            const result = await query(
+                `
+                SELECT
+                    id,
+                    organization,
+                    name,
+                    nickname,
+                    end_date
+                FROM leaders
+                WHERE id = $1
+                `,
+                [Number(req.params.id)]
+            );
 
-        if (!leader) {
-            return res.status(404).json({
-                error: "Лидер не найден"
+            if (result.rows.length === 0) {
+                return res.status(404).json({
+                    error: "Лидер не найден"
+                });
+            }
+
+            const leader = result.rows[0];
+
+            const date = new Date(
+                leader.end_date + "T00:00:00"
+            );
+
+            date.setDate(
+                date.getDate() + amount
+            );
+
+            const newDate =
+                date.toISOString().slice(0, 10);
+
+            await query(
+                `
+                UPDATE leaders
+                SET
+                    end_date = $1,
+                    updated_at = NOW()
+                WHERE id = $2
+                `,
+                [
+                    newDate,
+                    Number(req.params.id)
+                ]
+            );
+
+            await audit(
+                req.session.user.username,
+                amount >= 0
+                    ? "Добавление дней"
+                    : "Снятие дней",
+                `${leader.organization}: ${leader.name}; ${amount} дней`,
+                leader.id
+            );
+
+            res.json({
+                success: true,
+                old_date: leader.end_date,
+                new_date: newDate
+            });
+
+        } catch (error) {
+
+            console.error(
+                "Ошибка изменения срока лидера:",
+                error
+            );
+
+            res.status(500).json({
+                error: "Ошибка сервера"
             });
         }
-
-        const oldDate = leader.end_date;
-
-        const date = new Date(
-            leader.end_date + "T00:00:00"
-        );
-
-        date.setDate(
-            date.getDate() + amount
-        );
-
-        leader.end_date =
-            date.toISOString().slice(0, 10);
-
-        journal(
-            data,
-            req.session.user.username,
-            amount >= 0
-                ? "Добавление дней"
-                : "Снятие дней",
-            `${leader.structure}: ${leader.leader}; ${amount} дней`
-        );
-
-        saveData(data);
-
-        res.json({
-            success: true,
-            old_date: oldDate,
-            new_date: leader.end_date
-        });
     }
 );
 
@@ -590,40 +1022,69 @@ app.post(
 app.delete(
     "/api/leaders/:id",
     requireRole(ROLES.GS_CIVIL),
-    (req, res) => {
+    async (req, res) => {
 
-        const data = loadData();
+        try {
 
-        const index =
-            data.leaders.findIndex(
-                x => x.id === Number(req.params.id)
+            const result = await query(
+                `
+                SELECT
+                    id,
+                    organization,
+                    name
+                FROM leaders
+                WHERE id = $1
+                `,
+                [Number(req.params.id)]
             );
 
-        if (index === -1) {
-            return res.status(404).json({
-                error: "Лидер не найден"
+            if (result.rows.length === 0) {
+                return res.status(404).json({
+                    error: "Лидер не найден"
+                });
+            }
+
+            const leader = result.rows[0];
+
+            await query(
+                `
+                DELETE FROM leaders
+                WHERE id = $1
+                `,
+                [Number(req.params.id)]
+            );
+
+            await audit(
+                req.session.user.username,
+                "Снятие лидера",
+                `${leader.organization}: ${leader.name}`,
+                leader.id
+            );
+
+            res.json({
+                success: true
+            });
+
+        } catch (error) {
+
+            console.error(
+                "Ошибка удаления лидера:",
+                error
+            );
+
+            res.status(500).json({
+                error: "Ошибка сервера"
             });
         }
-
-        const leader =
-            data.leaders[index];
-
-        data.leaders.splice(index, 1);
-
-        journal(
-            data,
-            req.session.user.username,
-            "Снятие лидера",
-            `${leader.structure}: ${leader.leader}`
-        );
-
-        saveData(data);
-
-        res.json({
-            success: true
-        });
     }
 );
+
+const PENALTY_TYPES = [
+    "Предупреждение",
+    "Выговор",
+    "Неснимаемое предупреждение",
+    "Неснимаемый выговор"
+];
 
 /*
 =========================================
@@ -694,7 +1155,14 @@ app.post(
             });
         }
 
-        const penalty = {
+        
+        if (!PENALTY_TYPES.includes(type)) {
+            return res.status(400).json({
+                error: "Неизвестный тип наказания"
+            });
+        }
+
+const penalty = {
             id: Date.now(),
             leader_id: Number(leader_id),
             type,
@@ -722,27 +1190,350 @@ app.post(
     }
 );
 
+
+/*
+=========================================
+ DEPUTIES
+=========================================
+*/
+
+/*
+=========================================
+ DEPUTIES — POSTGRESQL
+=========================================
+*/
+
+app.get(
+    "/api/deputies",
+    requireAuth,
+    async (req, res) => {
+        try {
+            const result = await query(`
+                SELECT
+                    id,
+                    leader_id,
+                    organization AS structure,
+                    name AS deputy,
+                    nickname AS vk,
+                    position,
+                    start_date,
+                    end_date,
+                    status,
+                    created_at,
+                    updated_at
+                FROM deputies
+                ORDER BY organization, name
+            `);
+
+            res.json(result.rows);
+
+        } catch (error) {
+            console.error("Ошибка получения заместителей:", error);
+
+            res.status(500).json({
+                error: "Ошибка сервера"
+            });
+        }
+    }
+);
+
+app.post(
+    "/api/deputies",
+    requireRole(ROLES.ZGS_CIVIL),
+    async (req, res) => {
+
+        const {
+            structure,
+            deputy,
+            vk = "",
+            position = "Заместитель",
+            start_date = null,
+            end_date = null
+        } = req.body;
+
+        if (!structure || !deputy) {
+            return res.status(400).json({
+                error: "Заполните обязательные поля"
+            });
+        }
+
+        if (structure === "Конгресс") {
+            return res.status(400).json({
+                error: "У Конгресса нет должности заместителя"
+            });
+        }
+
+        if (!ORGANIZATIONS.includes(structure)) {
+            return res.status(400).json({
+                error: "Неизвестная организация"
+            });
+        }
+
+        try {
+
+            const id =
+                Date.now() +
+                Math.floor(Math.random() * 1000);
+
+            const leaderResult = await query(
+                `
+                SELECT id
+                FROM leaders
+                WHERE organization = $1
+                  AND status = 'Активен'
+                ORDER BY end_date DESC
+                LIMIT 1
+                `,
+                [structure]
+            );
+
+            const leaderId =
+                leaderResult.rows[0]?.id || null;
+
+            const result = await query(
+                `
+                INSERT INTO deputies
+                (
+                    id,
+                    leader_id,
+                    organization,
+                    name,
+                    nickname,
+                    position,
+                    start_date,
+                    end_date,
+                    status,
+                    created_at,
+                    updated_at
+                )
+                VALUES
+                (
+                    $1,$2,$3,$4,$5,$6,$7,$8,$9,NOW(),NOW()
+                )
+                RETURNING
+                    id,
+                    leader_id,
+                    organization AS structure,
+                    name AS deputy,
+                    nickname AS vk,
+                    position,
+                    start_date,
+                    end_date,
+                    status,
+                    created_at,
+                    updated_at
+                `,
+                [
+                    id,
+                    leaderId,
+                    structure,
+                    String(deputy).trim(),
+                    String(vk || "").trim(),
+                    position,
+                    start_date || null,
+                    end_date || null,
+                    "Активен"
+                ]
+            );
+
+            await audit(
+                req.session.user.username,
+                "Добавление заместителя",
+                `${structure}: ${deputy}`,
+                id
+            );
+
+            res.json(result.rows[0]);
+
+        } catch (error) {
+
+            console.error(
+                "Ошибка добавления заместителя:",
+                error
+            );
+
+            res.status(500).json({
+                error: "Ошибка сервера"
+            });
+        }
+    }
+);
+
+app.patch(
+    "/api/deputies/:id",
+    requireRole(ROLES.ZGS_CIVIL),
+    async (req, res) => {
+
+        const name =
+            String(req.body.deputy || "").trim();
+
+        if (!name) {
+            return res.status(400).json({
+                error: "Введите новый ник"
+            });
+        }
+
+        try {
+
+            const result = await query(
+                `
+                UPDATE deputies
+                SET
+                    name = $1,
+                    updated_at = NOW()
+                WHERE id = $2
+                RETURNING
+                    id,
+                    leader_id,
+                    organization AS structure,
+                    name AS deputy,
+                    nickname AS vk,
+                    position,
+                    start_date,
+                    end_date,
+                    status
+                `,
+                [
+                    name,
+                    Number(req.params.id)
+                ]
+            );
+
+            if (!result.rows.length) {
+                return res.status(404).json({
+                    error: "Заместитель не найден"
+                });
+            }
+
+            await audit(
+                req.session.user.username,
+                "Изменение ника заместителя",
+                `ID ${req.params.id} → ${name}`,
+                Number(req.params.id)
+            );
+
+            res.json({
+                success: true,
+                deputy: result.rows[0]
+            });
+
+        } catch (error) {
+
+            console.error(
+                "Ошибка изменения заместителя:",
+                error
+            );
+
+            res.status(500).json({
+                error: "Ошибка сервера"
+            });
+        }
+    }
+);
+
+app.delete(
+    "/api/deputies/:id",
+    requireRole(ROLES.ZGS_CIVIL),
+    async (req, res) => {
+
+        try {
+
+            const result = await query(
+                `
+                DELETE FROM deputies
+                WHERE id = $1
+                RETURNING
+                    id,
+                    organization,
+                    name
+                `,
+                [Number(req.params.id)]
+            );
+
+            if (!result.rows.length) {
+                return res.status(404).json({
+                    error: "Заместитель не найден"
+                });
+            }
+
+            const deputy = result.rows[0];
+
+            await audit(
+                req.session.user.username,
+                "Удаление заместителя",
+                `${deputy.organization}: ${deputy.name}`,
+                deputy.id
+            );
+
+            res.json({
+                success: true
+            });
+
+        } catch (error) {
+
+            console.error(
+                "Ошибка удаления заместителя:",
+                error
+            );
+
+            res.status(500).json({
+                error: "Ошибка сервера"
+            });
+        }
+    }
+);
+
 /*
 =========================================
  SUPERVISORS
 =========================================
 */
 
+/*
+=========================================
+ SUPERVISORS — POSTGRESQL
+=========================================
+*/
+
 app.get(
     "/api/supervisors",
     requireAuth,
-    (req, res) => {
+    async (req, res) => {
 
-        const data = loadData();
+        try {
 
-        res.json(data.supervisors);
+            const result = await query(`
+                SELECT
+                    id,
+                    name,
+                    role,
+                    position,
+                    created_at,
+                    updated_at
+                FROM supervisors
+                ORDER BY name
+            `);
+
+            res.json(result.rows);
+
+        } catch (error) {
+
+            console.error(
+                "Ошибка получения следящих:",
+                error
+            );
+
+            res.status(500).json({
+                error: "Ошибка сервера"
+            });
+        }
     }
 );
 
 app.post(
     "/api/supervisors",
     requireRole(ROLES.ZGS_CIVIL),
-    (req, res) => {
+    async (req, res) => {
 
         const {
             name,
@@ -750,129 +1541,216 @@ app.post(
             position = "Следящий"
         } = req.body;
 
-        if (!name) {
+        const cleanName =
+            String(name || "").trim();
+
+        const cleanPosition =
+            String(position || "").trim();
+
+        if (!cleanName) {
             return res.status(400).json({
                 error: "Введите имя"
             });
         }
 
-        const data = loadData();
+        if (!cleanPosition) {
+            return res.status(400).json({
+                error: "Выберите должность"
+            });
+        }
 
-        const supervisor = {
-            id: Date.now(),
-            name,
-            role,
-            position,
-            created_at:
-                new Date().toISOString()
-        };
+        try {
 
-        data.supervisors.push(supervisor);
+            const id =
+                Date.now() +
+                Math.floor(Math.random() * 1000);
 
-        journal(
-            data,
-            req.session.user.username,
-            "Добавлен следящий",
-            `${name}: ${position}`
-        );
+            const result = await query(
+                `
+                INSERT INTO supervisors
+                (
+                    id,
+                    name,
+                    role,
+                    position,
+                    created_at,
+                    updated_at
+                )
+                VALUES
+                (
+                    $1,
+                    $2,
+                    $3,
+                    $4,
+                    NOW(),
+                    NOW()
+                )
+                RETURNING
+                    id,
+                    name,
+                    role,
+                    position,
+                    created_at,
+                    updated_at
+                `,
+                [
+                    id,
+                    cleanName,
+                    role,
+                    cleanPosition
+                ]
+            );
 
-        saveData(data);
+            await audit(
+                req.session.user.username,
+                "Добавлен следящий",
+                `${cleanName}: ${cleanPosition}`,
+                id
+            );
 
-        res.json(supervisor);
+            res.json(result.rows[0]);
+
+        } catch (error) {
+
+            console.error(
+                "Ошибка добавления следящего:",
+                error
+            );
+
+            res.status(500).json({
+                error: "Ошибка сервера"
+            });
+        }
     }
 );
 
 app.patch(
     "/api/supervisors/:id",
     requireRole(ROLES.ZGS_CIVIL),
-    (req, res) => {
+    async (req, res) => {
 
-        const data = loadData();
+        const name =
+            String(req.body.name || "").trim();
 
-        const supervisor =
-            data.supervisors.find(
-                x =>
-                    x.id ===
-                    Number(req.params.id)
-            );
+        const position =
+            String(req.body.position || "").trim();
 
-        if (!supervisor) {
-            return res.status(404).json({
-                error: "Следящий не найден"
+        if (!name) {
+            return res.status(400).json({
+                error: "Введите имя"
             });
         }
 
-        if (req.body.position) {
-            supervisor.position =
-                req.body.position;
+        if (!position) {
+            return res.status(400).json({
+                error: "Выберите должность"
+            });
         }
 
-        if (req.body.role) {
+        try {
 
-            if (
-                req.session.user.role !==
-                ROLES.DEVELOPER
-            ) {
-                return res.status(403).json({
-                    error:
-                        "Только разработчик может менять роль"
+            const result = await query(
+                `
+                UPDATE supervisors
+                SET
+                    name = $1,
+                    position = $2,
+                    updated_at = NOW()
+                WHERE id = $3
+                RETURNING
+                    id,
+                    name,
+                    role,
+                    position,
+                    created_at,
+                    updated_at
+                `,
+                [
+                    name,
+                    position,
+                    Number(req.params.id)
+                ]
+            );
+
+            if (!result.rows.length) {
+                return res.status(404).json({
+                    error: "Следящий не найден"
                 });
             }
 
-            supervisor.role =
-                req.body.role;
+            await audit(
+                req.session.user.username,
+                "Изменён следящий",
+                `${name}: ${position}`,
+                Number(req.params.id)
+            );
+
+            res.json(result.rows[0]);
+
+        } catch (error) {
+
+            console.error(
+                "Ошибка изменения следящего:",
+                error
+            );
+
+            res.status(500).json({
+                error: "Ошибка сервера"
+            });
         }
-
-        journal(
-            data,
-            req.session.user.username,
-            "Изменение следящего",
-            `${supervisor.name}: ${supervisor.position}`
-        );
-
-        saveData(data);
-
-        res.json(supervisor);
     }
 );
 
 app.delete(
     "/api/supervisors/:id",
     requireRole(ROLES.ZGS_CIVIL),
-    (req, res) => {
+    async (req, res) => {
 
-        const data = loadData();
+        try {
 
-        const index =
-            data.supervisors.findIndex(
-                x =>
-                    x.id ===
-                    Number(req.params.id)
+            const result = await query(
+                `
+                DELETE FROM supervisors
+                WHERE id = $1
+                RETURNING
+                    id,
+                    name,
+                    position
+                `,
+                [Number(req.params.id)]
             );
 
-        if (index === -1) {
-            return res.status(404).json({
-                error: "Следящий не найден"
+            if (!result.rows.length) {
+                return res.status(404).json({
+                    error: "Следящий не найден"
+                });
+            }
+
+            const supervisor =
+                result.rows[0];
+
+            await audit(
+                req.session.user.username,
+                "Удалён следящий",
+                `${supervisor.name}: ${supervisor.position}`,
+                supervisor.id
+            );
+
+            res.json({
+                success: true
+            });
+
+        } catch (error) {
+
+            console.error(
+                "Ошибка удаления следящего:",
+                error
+            );
+
+            res.status(500).json({
+                error: "Ошибка сервера"
             });
         }
-
-        const supervisor =
-            data.supervisors[index];
-
-        data.supervisors.splice(index, 1);
-
-        journal(
-            data,
-            req.session.user.username,
-            "Удаление следящего",
-            supervisor.name
-        );
-
-        saveData(data);
-
-        res.json({
-            success: true
-        });
     }
 );
 
@@ -893,11 +1771,71 @@ app.get(
     }
 );
 
+
+/*
+=========================================
+ CIVIL DATA
+=========================================
+*/
+
+app.get(
+    "/api/data",
+    requireAuth,
+    (req, res) => {
+
+        const data = loadData();
+
+        res.json({
+            organizations: ORGANIZATIONS,
+            leaders: data.leaders || [],
+            deputies: data.deputies || [],
+            penalties: data.penalties || [],
+            supervisors: data.supervisors || []
+        });
+    }
+);
+
 /*
 =========================================
  STATIC
 =========================================
 */
+
+app.get(
+    "/api/audit",
+    requireRole(ROLES.DEVELOPER),
+    async (req, res) => {
+
+        try {
+
+            const result = await query(`
+                SELECT
+                    id,
+                    actor,
+                    action,
+                    details,
+                    target_user_id,
+                    created_at
+                FROM audit_log
+                ORDER BY created_at DESC
+                LIMIT 500
+            `);
+
+            res.json(result.rows);
+
+        } catch (error) {
+
+            console.error(
+                "Ошибка получения аудита:",
+                error
+            );
+
+            res.status(500).json({
+                error: "Ошибка сервера"
+            });
+        }
+    }
+);
 
 app.use((req, res) => {
 
@@ -916,15 +1854,29 @@ app.use((req, res) => {
     );
 });
 
-app.listen(PORT, () => {
+async function startServer() {
 
-    console.log("");
-    console.log("================================");
-    console.log("       ARIZONA CIVIL");
-    console.log("================================");
-    console.log(`Сайт: http://localhost:${PORT}`);
-    console.log("Авторизация: ВКЛ");
-    console.log("Роль разработчика: ВЫСШАЯ");
-    console.log("================================");
-    console.log("");
-});
+    try {
+        await initDatabase();
+
+        app.listen(PORT, () => {
+
+            console.log("");
+            console.log("================================");
+            console.log("       ARIZONA CIVIL");
+            console.log("================================");
+            console.log(`Сайт: http://localhost:${PORT}`);
+            console.log("Авторизация: ВКЛ");
+            console.log("PostgreSQL: ВКЛ");
+            console.log("================================");
+            console.log("");
+        });
+
+    } catch (error) {
+
+        console.error("Ошибка запуска PostgreSQL:", error);
+        process.exit(1);
+    }
+}
+
+startServer();

@@ -9,7 +9,7 @@
 
 <body>
 
-<div id="login-screen" class="login-screen">
+<div id="login-screen" class="miami-auth-screen" class="login-screen">
     <div class="login-box">
         <div class="login-logo">A</div>
         <div class="login-title">ARIZONA CIVIL</div>
@@ -25,6 +25,31 @@
         </form>
 
         <div id="login-error"></div>
+
+        <div class="auth-switch">
+            <span>Нет аккаунта?</span>
+            <button id="show-register" type="button">
+                Регистрация
+            </button>
+        </div>
+
+        <form id="register-form" class="hidden">
+            <input id="register-username" type="text" placeholder="Новый логин" minlength="3" maxlength="30" required>
+            <input id="register-password" type="password" placeholder="Новый пароль" minlength="6" required>
+            <input id="register-password-confirm" type="password" placeholder="Повторите пароль" minlength="6" required>
+
+            <button class="gold-btn" type="submit">
+                Зарегистрироваться
+            </button>
+        </form>
+
+        <div id="register-error"></div>
+
+        <div id="back-to-login" class="auth-switch hidden">
+            <button id="show-login" type="button">
+                ← Вернуться ко входу
+            </button>
+        </div>
     </div>
 </div>
 
@@ -202,13 +227,22 @@
         <div>
             <span>УПРАВЛЕНИЕ</span>
             <h1>Лидеры</h1>
-            <p>Контроль действующих руководителей</p>
+            <p>Управление лидерами и заместителями гражданских структур</p>
         </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+
+        <button id="add-deputy-btn"
+                class="secondary-btn permission-zgs">
+            + Добавить заместителя
+        </button>
 
         <button id="add-leader-btn"
                 class="gold-btn permission-zgs">
             + Добавить лидера
         </button>
+
+    </div>
 
     </div>
 
@@ -241,6 +275,38 @@
 
 </section>
 
+<section id="deputies-panel" class="page leaders-subsection">
+
+    <div class="page-title">
+        <div>
+            <span>УПРАВЛЕНИЕ</span>
+            <h2>Заместители</h2>
+            <p>Действующие заместители гражданских структур</p>
+        </div>
+    </div>
+
+    <div class="table-wrapper">
+
+        <table>
+
+            <thead>
+                <tr>
+                    <th>Организация</th>
+                    <th>Заместитель</th>
+                    <th>VK</th>
+                    <th>Дата назначения</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+
+            <tbody id="all-deputies-table"></tbody>
+
+        </table>
+
+    </div>
+
+</section>
+
 <section id="penalties" class="page">
 
     <div class="page-title">
@@ -248,7 +314,7 @@
         <div>
             <span>ДИСЦИПЛИНА</span>
             <h1>Наказания</h1>
-            <p>Предупреждения, выговоры и штрафы</p>
+            <p>Предупреждения и выговоры</p>
         </div>
 
     </div>
@@ -266,12 +332,17 @@
         </div>
 
         <div class="penalty-card">
-            <b>Строгий выговор</b>
+            <b>Неснимаемое предупреждение</b>
+            <span>Наказание без возможности снятия</span>
+        </div>
+
+        <div class="penalty-card">
+            <b>Неснимаемый выговор</b>
             <span>Серьёзное нарушение</span>
         </div>
 
         <div class="penalty-card">
-            <b>Штраф</b>
+            <b></b>
             <span>Финансовое взыскание</span>
         </div>
 
@@ -411,6 +482,7 @@
             <tr>
                 <th>Логин</th>
                 <th>Роль</th>
+                <th>Статус</th>
                 <th>Действия</th>
             </tr>
             </thead>
@@ -442,5 +514,7 @@
 
 <script src="/app.js"></script>
 
+    <script src="/navigation-fix.js"></script>
+    <script src="/organizations-fix.js"></script>
 </body>
 </html>
