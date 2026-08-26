@@ -556,193 +556,164 @@ function renderOrganizations() {
     }
 }
 
+
 /* LEADERS */
 
 function getDaysLeft(endDate) {
 
-    if (!endDate) {
-        return 0;
-    }
+    if (!endDate) return 0;
 
-    const end = new Date(
-        String(endDate).slice(0, 10) +
-        "T23:59:59"
-    );
+    const end = new Date(endDate);
 
-    if (Number.isNaN(end.getTime())) {
-        return 0;
-    }
+    if (Number.isNaN(end.getTime())) return 0;
 
     const now = new Date();
 
-    const diff =
-        end.getTime() -
-        now.getTime();
+    const diff = end.getTime() - now.getTime();
 
     return Math.max(
         0,
-        Math.ceil(
-            diff / 86400000
-        )
+        Math.ceil(diff / 86400000)
     );
-}
-
-function getDaysWord(days) {
-
-    days = Math.abs(Number(days));
-
-    if (days % 10 === 1 && days % 100 !== 11) {
-        return "день";
-    }
-
-    if (
-        days % 10 >= 2 &&
-        days % 10 <= 4 &&
-        (days % 100 < 10 || days % 100 >= 20)
-    ) {
-        return "дня";
-    }
-
-    return "дней";
 }
 
 function formatDate(date) {
 
-    if (!date) {
-        return "—";
+    if (!date) return "—";
+
+    const d = new Date(date);
+
+    if (Number.isNaN(d.getTime())) {
+        return String(date);
     }
 
-    const value =
-        String(date).slice(0, 10);
+    return d.toLocaleDateString("ru-RU", {
+        day: "2-digit",
+        month: "2-digit",
+        year: "numeric"
+    });
+}
 
-    const parts =
-        value.split("-");
+function vkLink(url) {
 
-    if (parts.length !== 3) {
-        return value;
+    if (!url) return "—";
+
+    const value = String(url).trim();
+
+    if (!/^https?:\/\//i.test(value)) {
+        return escapeHTML(value);
     }
 
-    return (
-        parts[2] +
-        "." +
-        parts[1] +
-        "." +
-        parts[0]
-    );
+    return `
+        <a
+            href="${escapeHTML(value)}"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="vk-link"
+        >
+            VK
+        </a>
+    `;
 }
 
 function statusHTML(status, endDate) {
 
+    const days = getDaysLeft(endDate);
+
     if (
         status !== "Активен" ||
-        getDaysLeft(endDate) <= 0
+        days <= 0
     ) {
-        return `<span class="status expired">Завершён</span>`;
+        return '<span class="status expired">Завершён</span>';
     }
 
-    return `<span class="status active">Активен</span>`;
+    return '<span class="status active">Активен</span>';
 }
 
 function leaderRow(l) {
+
+    const days = getDaysLeft(l.end_date);
 
     return `
         <tr>
 
             <td>
-                <b>${escapeHTML(l.structure)}</b>
+                <b>${escapeHTML(l.structure || "—")}</b>
             </td>
 
-            <td>${escapeHTML(l.leader)}</td>
+            <td>
+                ${escapeHTML(l.leader || "—")}
+            </td>
 
             <td>
-    ${
-        l.vk
-            ? (() => {
-                let url = String(l.vk).trim();
+                ${vkLink(l.vk)}
+            </td>
 
-                if (
-                    !url.startsWith("http://") &&
-                    !url.startsWith("https://")
-                ) {
-                    url = "https://" + url;
-                }
+            <td>
+                ${formatDate(l.start_date)}
+            </td>
 
-                return `
-                    <a
-                        href="${escapeHTML(url)}"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        class="vk-link">
-                        ${escapeHTML(l.vk)}
-                    </a>
-                `;
-            })()
-            : "—"
-    }
-</td>
-
-            <td>${formatDate(l.start_date)}</td>
-
-            <td>${formatDate(l.end_date)}</td>
+            <td>
+                ${formatDate(l.end_date)}
+            </td>
 
             <td class="days">
-                ${
-                    getDaysLeft(l.end_date) > 0
-                        ? `<span class="days-left">
-                                ${getDaysLeft(l.end_date)}
-                                ${getDaysWord(getDaysLeft(l.end_date))}
-                           </span>`
-                        : `<span class="days-left expired-days">
-                                Срок истёк
-                           </span>`
-                }
+                ${days} дн.
             </td>
 
             <td>
                 ${statusHTML(l.status, l.end_date)}
             </td>
 
-        
             <td>
                 <button
                     type="button"
                     class="danger-btn leader-delete-btn"
-                    onclick="deleteLeader(${l.id})">
+                    onclick="deleteLeader(${Number(l.id)})">
                     🗑 Удалить
                 </button>
             </td>
 
-</tr>
+        </tr>
     `;
 }
 
 function renderLeaders() {
 
-    $("all-leaders-table").innerHTML =
-        leaders.length
-            ? leaders.map(leaderRow).join("")
-            : emptyRow(8, "Лидеров пока нет");
+    const table = $("all-leaders-table");
 
-    $("stat-leaders").textContent =
-        leaders.filter(x =>
-            x.status === "Активен"
-        ).length;
+    if (!table) {
+        console.error("❌ all-leaders-table не найден");
+        return;
+    }
 
-    $("stat-active").textContent =
-        leaders.filter(x =>
-            x.status === "Активен" &&
-            getDaysLeft(x.end_date) > 0
-        ).length;
+    if (!Array.isArray(leaders)) {
+        console.error("❌ leaders не является массивом:", leaders);
+        table.innerHTML = `
+            <tr>
+                <td colspan="8">
+                    Ошибка загрузки лидеров
+                </td>
+            </tr>
+        `;
+        return;
+    }
 
-    $("stat-ending").textContent =
-        leaders.filter(x => {
+    if (leaders.length === 0) {
 
-            const days =
-                getDaysLeft(x.end_date);
+        table.innerHTML = `
+            <tr>
+                <td colspan="8" class="empty-state">
+                    Лидеры не назначены
+                </td>
+            </tr>
+        `;
 
-            return days > 0 && days <= 7;
+        return;
+    }
 
-        }).length;
+    table.innerHTML =
+        leaders.map(leaderRow).join("");
 }
 
 /* DEPUTIES */
