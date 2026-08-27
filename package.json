@@ -1,6 +1,6 @@
 {
   "name": "arizona-civil-dashboard",
-  "version": "1.0.0",
+  "version": "4.1.0",
   "description": "Панель гражданских структур Arizona RP",
   "main": "server.js",
   "scripts": {
@@ -9,7 +9,8 @@
     "dev": "node server.js",
     "check": "node --check server.js && node --check db.js && node --check permissions.js",
     "start:prod": "NODE_ENV=production node server.js",
-    "db:migrate": "node db.js"
+    "db:migrate": "node db.js",
+    "check:all": "node --check server.js && node --check db.js && node --check public/app.js"
   },
   "dependencies": {
     "connect-pg-simple": "^10.0.0",

@@ -61,7 +61,14 @@ const pgSession = require("connect-pg-simple")(session);
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
-const { initDatabase, initDatabaseV30, query, pool } = require("./db");
+const {
+        initDatabase,
+        initDatabaseV30,
+        initDatabaseV40,
+        initDatabaseV41,
+        query,
+        pool
+    } = require("./db");
 const {
     canManagePersonnel,
     canManageSupervisors,
@@ -4033,4 +4040,2015 @@ app.get("/api/version", (req, res) => {
         status: "production-ready"
     });
 });
+
+
+
+/*
+=========================================================
+ ARIZONA_CIVIL_4_1_API
+=========================================================
+*/
+
+
+const V41_MANAGER_ROLES = [
+    "Разработчик",
+    "ГС ГОС",
+    "ЗГС ГОС",
+    "ГС гражданских",
+    "ЗГС гражданских"
+];
+
+
+const V41_LEADER_ROLES = [
+    "Лидер",
+    "Заместитель"
+];
+
+
+const V41_ALLOWED_ROLES = [
+    "Разработчик",
+    "ГС ГОС",
+    "ЗГС ГОС",
+    "ГС гражданских",
+    "ЗГС гражданских",
+    "Помощник следящего за гражданской структурой",
+    "Следящий",
+    "Помощник следящего",
+    "Лидер",
+    "Заместитель",
+    "Пользователь"
+];
+
+
+function v41RoleLevel(role) {
+
+    const levels = {
+
+        "Пользователь": 0,
+
+        "Помощник следящего": 5,
+
+        "Следящий": 10,
+
+        "Лидер": 12,
+
+        "Заместитель": 13,
+
+        "Помощник следящего за гражданской структурой": 15,
+
+        "ЗГС гражданских": 20,
+
+        "ГС гражданских": 30,
+
+        "ЗГС ГОС": 40,
+
+        "ГС ГОС": 50,
+
+        "Разработчик": 100
+
+    };
+
+    return levels[role] ?? 0;
+}
+
+
+function v41CanManageRole(
+    actorRole,
+    targetRole
+) {
+
+    if (
+        !V41_MANAGER_ROLES.includes(
+            actorRole
+        )
+    ) {
+        return false;
+    }
+
+    return V41_LEADER_ROLES.includes(
+        targetRole
+    );
+}
+
+
+function v41CanManageUser(
+    actor,
+    target
+) {
+
+    if (!actor || !target) {
+        return false;
+    }
+
+    if (
+        actor.id === target.id
+    ) {
+        return false;
+    }
+
+    return (
+        v41RoleLevel(actor.role) >
+        v41RoleLevel(target.role)
+    );
+}
+
+
+async function v41Activity(
+    req,
+    eventType,
+    title,
+    details = "",
+    targetUserId = null,
+    organization = ""
+) {
+
+    try {
+
+        const actor =
+            req.session &&
+            req.session.user
+                ? req.session.user.username
+                : "system";
+
+
+        await query(`
+            INSERT INTO activity_events
+                (
+                    actor,
+                    event_type,
+                    title,
+                    details,
+                    target_user_id,
+                    organization
+                )
+            VALUES
+                ($1, $2, $3, $4, $5, $6)
+        `, [
+
+            actor,
+
+            eventType,
+
+            title,
+
+            details,
+
+            targetUserId,
+
+            organization
+
+        ]);
+
+    } catch (error) {
+
+        console.error(
+            "V4.1 activity:",
+            error.message
+        );
+
+    }
+}
+
+
+/*
+=========================================================
+ HEALTH
+=========================================================
+*/
+
+app.get(
+    "/api/v4/health",
+    async (req, res) => {
+
+        const started =
+            Date.now();
+
+        try {
+
+            await query(
+                "SELECT 1"
+            );
+
+            res.json({
+
+                ok: true,
+
+                version:
+                    "4.1.0",
+
+                database:
+                    "connected",
+
+                response_ms:
+                    Date.now() - started,
+
+                timestamp:
+                    new Date().toISOString()
+
+            });
+
+        } catch (error) {
+
+            console.error(
+                "V4.1 health:",
+                error
+            );
+
+            res.status(503)
+                .json({
+
+                    ok: false,
+
+                    version:
+                        "4.1.0",
+
+                    database:
+                        "error",
+
+                    response_ms:
+                        Date.now() - started,
+
+                    error:
+                        "Database unavailable"
+
+                });
+
+        }
+
+    }
+);
+
+
+/*
+=========================================================
+ VERSION
+=========================================================
+*/
+
+app.get(
+    "/api/v4/version",
+    (req, res) => {
+
+        res.json({
+
+            name:
+                "Arizona Civil",
+
+            version:
+                "4.1.0",
+
+            codename:
+                "Command Center",
+
+            status:
+                "production-ready",
+
+            api:
+                "v4.1"
+
+        });
+
+    }
+);
+
+
+/*
+=========================================================
+ DASHBOARD
+=========================================================
+*/
+
+app.get(
+    "/api/v4/dashboard",
+    requireAuth,
+    async (req, res) => {
+
+        try {
+
+            const [
+                users,
+                roles,
+                orgs,
+                appointments,
+                events,
+                notifications
+            ] = await Promise.all([
+
+                query(`
+                    SELECT
+                        COUNT(*)::int AS total,
+
+                        COUNT(*)
+                            FILTER (
+                                WHERE active
+                            )::int AS active,
+
+                        COUNT(*)
+                            FILTER (
+                                WHERE NOT active
+                            )::int AS inactive
+
+                    FROM users
+                `),
+
+                query(`
+                    SELECT
+                        role,
+                        COUNT(*)::int AS count
+
+                    FROM users
+
+                    GROUP BY role
+
+                    ORDER BY
+                        count DESC,
+                        role
+                `),
+
+                query(`
+                    SELECT
+                        organization,
+                        COUNT(*)::int AS count
+
+                    FROM users
+
+                    WHERE
+                        organization IS NOT NULL
+
+                        AND organization <> ''
+
+                    GROUP BY organization
+
+                    ORDER BY
+                        count DESC,
+                        organization
+                `),
+
+                query(`
+                    SELECT
+                        COUNT(*)::int AS count
+
+                    FROM appointments
+
+                    WHERE active = TRUE
+                `),
+
+                query(`
+                    SELECT
+                        id,
+                        actor,
+                        event_type,
+                        title,
+                        details,
+                        target_user_id,
+                        organization,
+                        created_at
+
+                    FROM activity_events
+
+                    ORDER BY
+                        created_at DESC
+
+                    LIMIT 12
+                `),
+
+                query(`
+                    SELECT
+                        COUNT(*)::int AS count
+
+                    FROM notifications
+
+                    WHERE
+                        user_id = $1
+
+                        AND read = FALSE
+                `,
+                [
+                    req.session.user.id
+                ])
+
+            ]);
+
+
+            res.json({
+
+                version:
+                    "4.1",
+
+                user:
+                    req.session.user,
+
+                users:
+                    users.rows[0],
+
+                roles:
+                    roles.rows,
+
+                organizations:
+                    orgs.rows,
+
+                appointments:
+                    appointments.rows[0],
+
+                notifications:
+                    notifications.rows[0],
+
+                events:
+                    events.rows
+
+            });
+
+        } catch (error) {
+
+            console.error(
+                "Dashboard V4.1:",
+                error
+            );
+
+            res.status(500).json({
+
+                error:
+                    "Ошибка dashboard V4.1"
+
+            });
+
+        }
+
+    }
+);
+
+
+/*
+=========================================================
+ PERSONNEL
+=========================================================
+*/
+
+app.get(
+    "/api/v4/personnel",
+    requireAuth,
+    async (req, res) => {
+
+        try {
+
+            const search =
+                String(
+                    req.query.search || ""
+                ).trim();
+
+
+            const role =
+                String(
+                    req.query.role || ""
+                ).trim();
+
+
+            const organization =
+                String(
+                    req.query.organization || ""
+                ).trim();
+
+
+            const active =
+                req.query.active === undefined
+                    ? ""
+                    : String(
+                        req.query.active
+                    );
+
+
+            const result =
+                await query(`
+
+                    SELECT
+
+                        id,
+
+                        username,
+
+                        name,
+
+                        role,
+
+                        position,
+
+                        organization,
+
+                        vk,
+
+                        avatar_url,
+
+                        active,
+
+                        appointed_at,
+
+                        appointed_by,
+
+                        created_at
+
+                    FROM users
+
+                    WHERE
+
+                        (
+                            $1 = ''
+
+                            OR username ILIKE
+                                '%' || $1 || '%'
+
+                            OR name ILIKE
+                                '%' || $1 || '%'
+                        )
+
+                        AND
+                        (
+                            $2 = ''
+                            OR role = $2
+                        )
+
+                        AND
+                        (
+                            $3 = ''
+                            OR COALESCE(
+                                organization,
+                                ''
+                            ) = $3
+                        )
+
+                        AND
+                        (
+                            $4 = ''
+                            OR active =
+                                ($4 = 'true')
+                        )
+
+                    ORDER BY
+
+                        CASE role
+
+                            WHEN 'Разработчик'
+                                THEN 1
+
+                            WHEN 'ГС ГОС'
+                                THEN 2
+
+                            WHEN 'ЗГС ГОС'
+                                THEN 3
+
+                            WHEN 'ГС гражданских'
+                                THEN 4
+
+                            WHEN 'ЗГС гражданских'
+                                THEN 5
+
+                            WHEN 'Помощник следящего за гражданской структурой'
+                                THEN 6
+
+                            WHEN 'Следящий'
+                                THEN 7
+
+                            WHEN 'Помощник следящего'
+                                THEN 8
+
+                            WHEN 'Заместитель'
+                                THEN 9
+
+                            WHEN 'Лидер'
+                                THEN 10
+
+                            ELSE 11
+
+                        END,
+
+                        LOWER(username)
+
+                `,
+                [
+                    search,
+                    role,
+                    organization,
+                    active
+                ]);
+
+
+            res.json(
+                result.rows
+            );
+
+        } catch (error) {
+
+            console.error(
+                "Personnel V4.1:",
+                error
+            );
+
+            res.status(500).json({
+
+                error:
+                    "Ошибка получения персонала"
+
+            });
+
+        }
+
+    }
+);
+
+
+/*
+=========================================================
+ PERSONNEL PROFILE
+=========================================================
+*/
+
+app.get(
+    "/api/v4/personnel/:id",
+    requireAuth,
+    async (req, res) => {
+
+        try {
+
+            const id =
+                Number(
+                    req.params.id
+                );
+
+
+            if (
+                !Number.isSafeInteger(id)
+            ) {
+
+                return res.status(400)
+                    .json({
+
+                        error:
+                            "Некорректный ID"
+
+                    });
+
+            }
+
+
+            const user =
+                await query(`
+
+                    SELECT
+
+                        id,
+                        username,
+                        name,
+                        role,
+                        position,
+                        organization,
+                        vk,
+                        avatar_url,
+                        active,
+                        appointed_at,
+                        appointed_by,
+                        created_at
+
+                    FROM users
+
+                    WHERE id = $1
+
+                `,
+                [id]);
+
+
+            if (
+                !user.rows.length
+            ) {
+
+                return res.status(404)
+                    .json({
+
+                        error:
+                            "Сотрудник не найден"
+
+                    });
+
+            }
+
+
+            const [
+                history,
+                appointments,
+                notes
+            ] = await Promise.all([
+
+                query(`
+
+                    SELECT
+
+                        action,
+                        details,
+                        actor,
+                        created_at
+
+                    FROM personnel_history
+
+                    WHERE user_id = $1
+
+                    ORDER BY
+                        created_at DESC
+
+                    LIMIT 100
+
+                `,
+                [id]),
+
+                query(`
+
+                    SELECT
+
+                        role,
+                        organization,
+                        appointed_by,
+                        start_date,
+                        end_date,
+                        active
+
+                    FROM appointments
+
+                    WHERE user_id = $1
+
+                    ORDER BY
+                        start_date DESC
+
+                `,
+                [id]),
+
+                query(`
+
+                    SELECT
+
+                        id,
+                        author,
+                        note,
+                        created_at
+
+                    FROM personnel_notes_v4
+
+                    WHERE user_id = $1
+
+                    ORDER BY
+                        created_at DESC
+
+                    LIMIT 50
+
+                `,
+                [id])
+
+            ]);
+
+
+            res.json({
+
+                user:
+                    user.rows[0],
+
+                history:
+                    history.rows,
+
+                appointments:
+                    appointments.rows,
+
+                notes:
+                    notes.rows
+
+            });
+
+        } catch (error) {
+
+            console.error(
+                "Profile V4.1:",
+                error
+            );
+
+            res.status(500).json({
+
+                error:
+                    "Ошибка профиля"
+
+            });
+
+        }
+
+    }
+);
+
+
+/*
+=========================================================
+ ROLE MANAGEMENT
+=========================================================
+*/
+
+app.patch(
+    "/api/v4/personnel/:id/role",
+    requireAuth,
+    async (req, res) => {
+
+        try {
+
+            const actor =
+                req.session.user;
+
+
+            const id =
+                Number(
+                    req.params.id
+                );
+
+
+            const newRole =
+                String(
+                    req.body.role || ""
+                ).trim();
+
+
+            if (
+                !Number.isSafeInteger(id)
+            ) {
+
+                return res.status(400)
+                    .json({
+
+                        error:
+                            "Некорректный ID"
+
+                    });
+
+            }
+
+
+            if (
+                !V41_ALLOWED_ROLES.includes(
+                    newRole
+                )
+            ) {
+
+                return res.status(400)
+                    .json({
+
+                        error:
+                            "Неизвестная роль"
+
+                    });
+
+            }
+
+
+            if (
+                !v41CanManageRole(
+                    actor.role,
+                    newRole
+                )
+            ) {
+
+                return res.status(403)
+                    .json({
+
+                        error:
+                            "Недостаточно прав для назначения этой роли"
+
+                    });
+
+            }
+
+
+            const current =
+                await query(`
+
+                    SELECT
+
+                        id,
+                        username,
+                        name,
+                        role,
+                        organization
+
+                    FROM users
+
+                    WHERE id = $1
+
+                `,
+                [id]);
+
+
+            if (
+                !current.rows.length
+            ) {
+
+                return res.status(404)
+                    .json({
+
+                        error:
+                            "Пользователь не найден"
+
+                    });
+
+            }
+
+
+            const target =
+                current.rows[0];
+
+
+            if (
+                actor.id === target.id
+            ) {
+
+                return res.status(403)
+                    .json({
+
+                        error:
+                            "Нельзя изменять собственную роль"
+
+                    });
+
+            }
+
+
+            if (
+                !v41CanManageUser(
+                    actor,
+                    target
+                )
+            ) {
+
+                return res.status(403)
+                    .json({
+
+                        error:
+                            "Нельзя управлять пользователем равного или более высокого уровня"
+
+                    });
+
+            }
+
+
+            const oldRole =
+                target.role;
+
+
+            if (
+                oldRole === newRole
+            ) {
+
+                return res.json(
+                    target
+                );
+
+            }
+
+
+            const updated =
+                await query(`
+
+                    UPDATE users
+
+                    SET role = $1
+
+                    WHERE id = $2
+
+                    RETURNING
+
+                        id,
+                        username,
+                        name,
+                        role,
+                        position,
+                        organization,
+                        vk,
+                        avatar_url,
+                        active
+
+                `,
+                [
+                    newRole,
+                    id
+                ]);
+
+
+            await query(`
+
+                INSERT INTO role_history
+                    (
+                        user_id,
+                        old_role,
+                        new_role,
+                        changed_by
+                    )
+
+                VALUES
+                    ($1, $2, $3, $4)
+
+            `,
+            [
+                id,
+                oldRole,
+                newRole,
+                actor.username
+            ]);
+
+
+            await query(`
+
+                INSERT INTO personnel_history
+                    (
+                        user_id,
+                        action,
+                        details,
+                        actor
+                    )
+
+                VALUES
+                    ($1, $2, $3, $4)
+
+            `,
+            [
+                id,
+                "Изменение роли",
+                oldRole +
+                    " → " +
+                    newRole,
+                actor.username
+            ]);
+
+
+            await v41Activity(
+                req,
+                "role",
+                "Изменена роль сотрудника",
+                oldRole +
+                    " → " +
+                    newRole,
+                id,
+                target.organization || ""
+            );
+
+
+            await query(`
+
+                INSERT INTO notifications
+                    (
+                        user_id,
+                        title,
+                        message,
+                        type
+                    )
+
+                VALUES
+                    ($1, $2, $3, $4)
+
+            `,
+            [
+                id,
+                "Изменение роли",
+                "Вам назначена роль: " +
+                    newRole,
+                "role"
+            ]);
+
+
+            res.json(
+                updated.rows[0]
+            );
+
+        } catch (error) {
+
+            console.error(
+                "V4.1 role:",
+                error
+            );
+
+            res.status(500).json({
+
+                error:
+                    "Ошибка изменения роли"
+
+            });
+
+        }
+
+    }
+);
+
+
+/*
+=========================================================
+ ORGANIZATION ASSIGNMENT
+=========================================================
+*/
+
+app.patch(
+    "/api/v4/personnel/:id/organization",
+    requireAuth,
+    async (req, res) => {
+
+        try {
+
+            const actor =
+                req.session.user;
+
+
+            if (
+                !V41_MANAGER_ROLES.includes(
+                    actor.role
+                )
+            ) {
+
+                return res.status(403)
+                    .json({
+
+                        error:
+                            "Недостаточно прав"
+
+                    });
+
+            }
+
+
+            const id =
+                Number(
+                    req.params.id
+                );
+
+
+            const organization =
+                String(
+                    req.body.organization || ""
+                ).trim();
+
+
+            const position =
+                String(
+                    req.body.position || ""
+                ).trim();
+
+
+            if (
+                !Number.isSafeInteger(id)
+                ||
+                !organization
+            ) {
+
+                return res.status(400)
+                    .json({
+
+                        error:
+                            "Укажите сотрудника и структуру"
+
+                    });
+
+            }
+
+
+            const current =
+                await query(`
+
+                    SELECT
+
+                        id,
+                        organization,
+                        position,
+                        username,
+                        role
+
+                    FROM users
+
+                    WHERE id = $1
+
+                `,
+                [id]);
+
+
+            if (
+                !current.rows.length
+            ) {
+
+                return res.status(404)
+                    .json({
+
+                        error:
+                            "Пользователь не найден"
+
+                    });
+
+            }
+
+
+            const target =
+                current.rows[0];
+
+
+            if (
+                actor.id === target.id
+            ) {
+
+                return res.status(403)
+                    .json({
+
+                        error:
+                            "Нельзя изменять собственное назначение"
+
+                    });
+
+            }
+
+
+            if (
+                !v41CanManageUser(
+                    actor,
+                    target
+                )
+            ) {
+
+                return res.status(403)
+                    .json({
+
+                        error:
+                            "Нельзя управлять пользователем равного или более высокого уровня"
+
+                    });
+
+            }
+
+
+            const updated =
+                await query(`
+
+                    UPDATE users
+
+                    SET
+
+                        organization = $1,
+
+                        position =
+                            CASE
+                                WHEN $2 <> ''
+                                THEN $2
+                                ELSE position
+                            END,
+
+                        appointed_at =
+                            NOW(),
+
+                        appointed_by =
+                            $3
+
+                    WHERE id = $4
+
+                    RETURNING
+
+                        id,
+                        username,
+                        name,
+                        role,
+                        position,
+                        organization,
+                        vk,
+                        avatar_url,
+                        active
+
+                `,
+                [
+                    organization,
+                    position,
+                    actor.username,
+                    id
+                ]);
+
+
+            await query(`
+
+                INSERT INTO organization_members
+                    (
+                        user_id,
+                        organization,
+                        role,
+                        position,
+                        appointed_by
+                    )
+
+                VALUES
+                    (
+                        $1,
+                        $2,
+                        (
+                            SELECT role
+                            FROM users
+                            WHERE id = $1
+                        ),
+                        $3,
+                        $4
+                    )
+
+            `,
+            [
+                id,
+                organization,
+                position,
+                actor.username
+            ]);
+
+
+            await query(`
+
+                INSERT INTO personnel_history
+                    (
+                        user_id,
+                        action,
+                        details,
+                        actor
+                    )
+
+                VALUES
+                    ($1, $2, $3, $4)
+
+            `,
+            [
+                id,
+
+                "Назначение в структуру",
+
+                (
+                    target.organization ||
+                    "Без структуры"
+                ) +
+                    " → " +
+                    organization,
+
+                actor.username
+            ]);
+
+
+            await v41Activity(
+                req,
+                "organization",
+                "Изменено назначение",
+                organization,
+                id,
+                organization
+            );
+
+
+            await query(`
+
+                INSERT INTO notifications
+                    (
+                        user_id,
+                        title,
+                        message,
+                        type
+                    )
+
+                VALUES
+                    ($1, $2, $3, $4)
+
+            `,
+            [
+                id,
+                "Новое назначение",
+                "Вы назначены в структуру: " +
+                    organization,
+                "organization"
+            ]);
+
+
+            res.json(
+                updated.rows[0]
+            );
+
+        } catch (error) {
+
+            console.error(
+                "V4.1 organization:",
+                error
+            );
+
+            res.status(500).json({
+
+                error:
+                    "Ошибка назначения"
+
+            });
+
+        }
+
+    }
+);
+
+
+/*
+=========================================================
+ NOTES
+=========================================================
+*/
+
+app.post(
+    "/api/v4/personnel/:id/notes",
+    requireAuth,
+    async (req, res) => {
+
+        try {
+
+            const id =
+                Number(
+                    req.params.id
+                );
+
+
+            const note =
+                String(
+                    req.body.note || ""
+                ).trim();
+
+
+            if (
+                !Number.isSafeInteger(id)
+                ||
+                !note
+            ) {
+
+                return res.status(400)
+                    .json({
+
+                        error:
+                            "Введите заметку"
+
+                    });
+
+            }
+
+
+            if (
+                note.length > 2000
+            ) {
+
+                return res.status(400)
+                    .json({
+
+                        error:
+                            "Заметка слишком длинная"
+
+                    });
+
+            }
+
+
+            const actor =
+                req.session.user;
+
+
+            if (
+                !V41_MANAGER_ROLES.includes(
+                    actor.role
+                )
+                &&
+                actor.role !==
+                    "Следящий"
+            ) {
+
+                return res.status(403)
+                    .json({
+
+                        error:
+                            "Недостаточно прав"
+
+                    });
+
+            }
+
+
+            const target =
+                await query(`
+
+                    SELECT
+                        id,
+                        username
+
+                    FROM users
+
+                    WHERE id = $1
+
+                `,
+                [id]);
+
+
+            if (
+                !target.rows.length
+            ) {
+
+                return res.status(404)
+                    .json({
+
+                        error:
+                            "Сотрудник не найден"
+
+                    });
+
+            }
+
+
+            const result =
+                await query(`
+
+                    INSERT INTO personnel_notes_v4
+                        (
+                            user_id,
+                            author,
+                            note
+                        )
+
+                    VALUES
+                        ($1, $2, $3)
+
+                    RETURNING
+
+                        id,
+                        author,
+                        note,
+                        created_at
+
+                `,
+                [
+                    id,
+                    actor.username,
+                    note
+                ]);
+
+
+            await v41Activity(
+                req,
+                "note",
+                "Добавлена заметка",
+                note.slice(0, 200),
+                id
+            );
+
+
+            res.json(
+                result.rows[0]
+            );
+
+        } catch (error) {
+
+            console.error(
+                "V4.1 note:",
+                error
+            );
+
+            res.status(500).json({
+
+                error:
+                    "Ошибка сохранения заметки"
+
+            });
+
+        }
+
+    }
+);
+
+
+/*
+=========================================================
+ NOTIFICATIONS
+=========================================================
+*/
+
+app.get(
+    "/api/v4/notifications",
+    requireAuth,
+    async (req, res) => {
+
+        try {
+
+            const result =
+                await query(`
+
+                    SELECT
+
+                        id,
+                        title,
+                        message,
+                        type,
+                        read,
+                        created_at
+
+                    FROM notifications
+
+                    WHERE user_id = $1
+
+                    ORDER BY
+                        created_at DESC
+
+                    LIMIT 50
+
+                `,
+                [
+                    req.session.user.id
+                ]);
+
+
+            res.json(
+                result.rows
+            );
+
+        } catch (error) {
+
+            console.error(
+                "V4.1 notifications:",
+                error
+            );
+
+            res.status(500).json({
+
+                error:
+                    "Ошибка уведомлений"
+
+            });
+
+        }
+
+    }
+);
+
+
+app.patch(
+    "/api/v4/notifications/:id/read",
+    requireAuth,
+    async (req, res) => {
+
+        try {
+
+            const notificationId =
+                Number(
+                    req.params.id
+                );
+
+
+            if (
+                !Number.isSafeInteger(
+                    notificationId
+                )
+            ) {
+
+                return res.status(400)
+                    .json({
+
+                        error:
+                            "Некорректный ID"
+
+                    });
+
+            }
+
+
+            const result =
+                await query(`
+
+                    UPDATE notifications
+
+                    SET read = TRUE
+
+                    WHERE
+
+                        id = $1
+
+                        AND user_id = $2
+
+                    RETURNING id
+
+                `,
+                [
+                    notificationId,
+                    req.session.user.id
+                ]);
+
+
+            if (
+                !result.rows.length
+            ) {
+
+                return res.status(404)
+                    .json({
+
+                        error:
+                            "Уведомление не найдено"
+
+                    });
+
+            }
+
+
+            res.json({
+
+                success:
+                    true
+
+            });
+
+        } catch (error) {
+
+            console.error(
+                "V4.1 notification:",
+                error
+            );
+
+            res.status(500).json({
+
+                error:
+                    "Ошибка уведомления"
+
+            });
+
+        }
+
+    }
+);
+
+
+/*
+=========================================================
+ ACTIVITY
+=========================================================
+*/
+
+app.get(
+    "/api/v4/activity",
+    requireAuth,
+    async (req, res) => {
+
+        try {
+
+            const result =
+                await query(`
+
+                    SELECT
+
+                        id,
+                        actor,
+                        event_type,
+                        title,
+                        details,
+                        target_user_id,
+                        organization,
+                        created_at
+
+                    FROM activity_events
+
+                    ORDER BY
+                        created_at DESC
+
+                    LIMIT 100
+
+                `);
+
+
+            res.json(
+                result.rows
+            );
+
+        } catch (error) {
+
+            console.error(
+                "V4.1 activity:",
+                error
+            );
+
+            res.status(500).json({
+
+                error:
+                    "Ошибка активности"
+
+            });
+
+        }
+
+    }
+);
+
+
+/*
+=========================================================
+ ROLES
+=========================================================
+*/
+
+app.get(
+    "/api/v4/roles",
+    requireAuth,
+    (req, res) => {
+
+        res.json([
+
+            {
+                name:
+                    "Разработчик",
+                level:
+                    100
+            },
+
+            {
+                name:
+                    "ГС ГОС",
+                level:
+                    50
+            },
+
+            {
+                name:
+                    "ЗГС ГОС",
+                level:
+                    40
+            },
+
+            {
+                name:
+                    "ГС гражданских",
+                level:
+                    30
+            },
+
+            {
+                name:
+                    "ЗГС гражданских",
+                level:
+                    20
+            },
+
+            {
+                name:
+                    "Помощник следящего за гражданской структурой",
+                level:
+                    15
+            },
+
+            {
+                name:
+                    "Заместитель",
+                level:
+                    13
+            },
+
+            {
+                name:
+                    "Лидер",
+                level:
+                    12
+            },
+
+            {
+                name:
+                    "Следящий",
+                level:
+                    10
+            },
+
+            {
+                name:
+                    "Помощник следящего",
+                level:
+                    5
+            },
+
+            {
+                name:
+                    "Пользователь",
+                level:
+                    0
+            }
+
+        ]);
+
+    }
+);
+
+
+/*
+=========================================================
+ ORGANIZATIONS
+=========================================================
+*/
+
+app.get(
+    "/api/v4/organizations",
+    requireAuth,
+    async (req, res) => {
+
+        try {
+
+            const result =
+                await query(`
+
+                    SELECT
+
+                        organization,
+
+                        COUNT(*)::int
+                            AS total,
+
+                        COUNT(*)
+                            FILTER (
+                                WHERE active
+                            )::int
+                            AS active
+
+                    FROM users
+
+                    WHERE
+
+                        organization IS NOT NULL
+
+                        AND organization <> ''
+
+                    GROUP BY
+                        organization
+
+                    ORDER BY
+                        organization
+
+                `);
+
+
+            res.json(
+                result.rows
+            );
+
+        } catch (error) {
+
+            console.error(
+                "V4.1 organizations:",
+                error
+            );
+
+            res.status(500).json({
+
+                error:
+                    "Ошибка организаций"
+
+            });
+
+        }
+
+    }
+);
+
+
+/*
+=========================================================
+ SYSTEM SETTINGS
+=========================================================
+*/
+
+app.get(
+    "/api/v4/settings",
+    requireAuth,
+    async (req, res) => {
+
+        try {
+
+            const result =
+                await query(`
+
+                    SELECT
+
+                        key,
+                        value,
+                        updated_by,
+                        updated_at
+
+                    FROM system_settings
+
+                    ORDER BY key
+
+                `);
+
+
+            res.json(
+                result.rows
+            );
+
+        } catch (error) {
+
+            console.error(
+                "V4.1 settings:",
+                error
+            );
+
+            res.status(500).json({
+
+                error:
+                    "Ошибка настроек"
+
+            });
+
+        }
+
+    }
+);
+
 

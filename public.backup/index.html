@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Arizona Civil — Управление</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app-shell">
+<aside class="sidebar">
+  <div class="logo"><span>ARIZONA</span><strong>CIVIL</strong></div>
+  <div class="logo-sub">Центр управления структурами</div>
+  <div class="server-status"><i></i><span>Система онлайн</span></div>
+  <nav>
+    <button class="nav active" data-page="dashboard"><span>⌂</span> Обзор</button>
+    <button class="nav" data-page="leaders"><span>♙</span> Лидеры</button>
+    <button class="nav" data-page="penalties"><span>!</span> Взыскания</button>
+    <button class="nav" data-page="calendar"><span>◷</span> Сроки</button>
+  </nav>
+  <div class="sidebar-bottom"><div>ARIZONA RP</div><small>Civil Administration</small></div>
+</aside>
+<main class="main">
+<header class="topbar">
+  <div><div class="eyebrow">ARIZONA ROLE PLAY · CIVIL</div><h1 id="title">Центр управления</h1><p id="subtitle">Контроль лидеров, сроков и дисциплины</p></div>
+  <div class="top-actions"><button class="icon-btn" id="refresh">↻</button><button class="primary" id="addLeader">＋ Новый лидер</button></div>
+</header>
+<section id="dashboard" class="page">
+  <div class="stats">
+    <div class="stat"><div class="stat-icon">♙</div><div><span>Активные лидеры</span><strong id="sLeaders">—</strong><small>назначенные руководители</small></div></div>
+    <div class="stat"><div class="stat-icon">✓</div><div><span>Действующие сроки</span><strong id="sActive">—</strong><small>срок ещё не истёк</small></div></div>
+    <div class="stat"><div class="stat-icon">!</div><div><span>Всего взысканий</span><strong id="sPenalties">—</strong><small>предупреждения и выговоры</small></div></div>
+    <div class="stat warning"><div class="stat-icon">⏱</div><div><span>Требуют внимания</span><strong id="sAttention">—</strong><small>7 дней или меньше</small></div></div>
+  </div>
+  <div class="dashboard-grid">
+    <div class="panel large"><div class="panel-head"><div><h2>Ближайшие окончания</h2><p>Лидеры с самым близким окончанием срока</p></div><button class="link-btn" data-page="calendar">Все сроки →</button></div><div id="soon" class="list"></div></div>
+    <div class="panel"><div class="panel-head"><div><h2>Структуры</h2><p>Текущее состояние</p></div></div><div id="structureStats" class="structure-list"></div></div>
+    <div class="panel"><div class="panel-head"><div><h2>Последние взыскания</h2><p>Последние дисциплинарные записи</p></div><button class="link-btn" data-page="penalties">Все →</button></div><div id="recent" class="list"></div></div>
+    <div class="panel"><div class="panel-head"><div><h2>Быстрые действия</h2><p>Управление без лишних переходов</p></div></div><div class="quick"><button id="quickLeader">＋ Добавить лидера</button><button id="quickPenalty">＋ Добавить взыскание</button><button data-page="leaders">♙ Открыть список лидеров</button><button data-page="calendar">◷ Проверить сроки</button></div></div>
+  </div>
+</section>
+<section id="leaders" class="page hidden">
+ <div class="panel"><div class="page-head"><div><h2>Лидеры гражданских структур</h2><p>Назначения, сроки и текущий статус</p></div><button class="primary" id="addLeader2">＋ Добавить</button></div>
+ <div class="filters"><div class="search"><span>⌕</span><input id="leaderSearch" placeholder="Поиск по лидеру, структуре или VK…"></div><select id="statusFilter"><option value="">Все статусы</option><option>Активен</option><option>Завершён</option></select></div>
+ <div class="tablewrap"><table><thead><tr><th>Структура</th><th>Лидер</th><th>VK</th><th>Срок</th><th>Осталось</th><th>Статус</th><th></th></tr></thead><tbody id="leadersTable"></tbody></table></div></div>
+</section>
+<section id="penalties" class="page hidden">
+ <div class="panel"><div class="page-head"><div><h2>Дисциплинарные взыскания</h2><p>Предупреждения, выговоры и их стоимость</p></div><button class="primary" id="addPenalty">＋ Добавить</button></div>
+ <div class="filters"><div class="search"><span>⌕</span><input id="penaltySearch" placeholder="Поиск по причине, лидеру или структуре…"></div><select id="penaltyType"><option value="">Все типы</option><option>Предупреждение</option><option>Выговор</option><option>Строгий выговор</option></select></div>
+ <div class="tablewrap"><table><thead><tr><th>Дата</th><th>Структура</th><th>Лидер</th><th>Тип</th><th>Причина</th><th>Стоимость</th><th></th></tr></thead><tbody id="penaltyTable"></tbody></table></div></div>
+</section>
+<section id="calendar" class="page hidden">
+ <div class="panel"><div class="page-head"><div><h2>Контроль сроков</h2><p>Приоритет отсортирован по дате окончания</p></div></div><div id="calendarList" class="deadline-list"></div></div>
+</section>
+</main></div>
+<dialog id="leaderModal"><form id="leaderForm"><button type="button" class="modal-close" data-close="leaderModal">×</button><div class="modal-title"><div class="modal-icon">♙</div><div><h2>Новый лидер</h2><p>Добавьте руководителя гражданской структуры</p></div></div><div class="form-grid"><label>Структура<input name="structure" placeholder="Например, LSPD" required></label><label>Лидер<input name="leader" placeholder="ФИО / игровой ник" required></label><label>VK<input name="vk" placeholder="@username или ID"></label><label>Статус<select name="status"><option>Активен</option><option>Завершён</option></select></label><label>Начало срока<input name="start_date" type="date" required></label><label>Конец срока<input name="end_date" type="date" required></label></div><div class="modal-actions"><button type="button" class="secondary" data-close="leaderModal">Отмена</button><button class="primary">Сохранить лидера</button></div></form></dialog>
+<dialog id="penaltyModal"><form id="penaltyForm"><button type="button" class="modal-close" data-close="penaltyModal">×</button><div class="modal-title"><div class="modal-icon danger">!</div><div><h2>Новое взыскание</h2><p>Зафиксируйте дисциплинарное нарушение</p></div></div><label>Лидер<select name="leader_id" id="leaderSelect" required></select></label><div class="form-grid"><label>Тип<select name="type"><option>Предупреждение</option><option>Выговор</option><option>Строгий выговор</option></select></label><label>Стоимость<input name="amount" type="number" min="0" placeholder="0"></label></div><label>Причина<input name="reason" placeholder="Причина взыскания" required></label><label>Дата<input name="date" type="date" required></label><div class="modal-actions"><button type="button" class="secondary" data-close="penaltyModal">Отмена</button><button class="primary">Сохранить взыскание</button></div></form></dialog>
+<script src="app.js"></script>
+</body></html>

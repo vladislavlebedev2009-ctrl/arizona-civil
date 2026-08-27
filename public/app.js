@@ -6481,3 +6481,2280 @@ async function openV3PersonnelProfile(id) {
         );
     }
 }
+
+
+
+/* =========================================================
+   ARIZONA_CIVIL_4_1_FRONTEND
+========================================================= */
+
+(function ArizonaCivilV41() {
+
+    "use strict";
+
+
+    const esc =
+        window.escapeHTML ||
+        (
+            value =>
+                String(
+                    value ?? ""
+                )
+                .replaceAll(
+                    "&",
+                    "&amp;"
+                )
+                .replaceAll(
+                    "<",
+                    "&lt;"
+                )
+                .replaceAll(
+                    ">",
+                    "&gt;"
+                )
+                .replaceAll(
+                    '"',
+                    "&quot;"
+                )
+                .replaceAll(
+                    "'",
+                    "&#039;"
+                )
+        );
+
+
+    const request =
+        window.api ||
+        (
+            async (
+                url,
+                options = {}
+            ) => {
+
+                const response =
+                    await fetch(
+                        url,
+                        {
+                            credentials:
+                                "same-origin",
+
+                            ...options
+                        }
+                    );
+
+
+                const data =
+                    await response
+                        .json()
+                        .catch(
+                            () => ({})
+                        );
+
+
+                if (
+                    !response.ok
+                ) {
+
+                    throw new Error(
+                        data.error ||
+                        "Ошибка сервера"
+                    );
+
+                }
+
+
+                return data;
+
+            }
+        );
+
+
+    let currentPage =
+        "dashboard";
+
+
+    let dashboard =
+        null;
+
+
+    let personnel =
+        [];
+
+
+    let currentPersonnelSearch =
+        "";
+
+
+    function root() {
+
+        return (
+            document.querySelector(
+                "main"
+            )
+
+            ||
+
+            document.querySelector(
+                ".content"
+            )
+
+            ||
+
+            document.querySelector(
+                ".main-content"
+            )
+
+            ||
+
+            document.body
+        );
+
+    }
+
+
+    function ensureButton() {
+
+        if (
+            document.getElementById(
+                "ac-v41-command-button"
+            )
+        ) {
+
+            return;
+
+        }
+
+
+        const button =
+            document.createElement(
+                "button"
+            );
+
+
+        button.id =
+            "ac-v41-command-button";
+
+
+        button.className =
+            "ac-v4-btn primary";
+
+
+        button.textContent =
+            "✦ Command Center 4.1";
+
+
+        button.style.position =
+            "fixed";
+
+
+        button.style.right =
+            "18px";
+
+
+        button.style.bottom =
+            "18px";
+
+
+        button.style.zIndex =
+            "9998";
+
+
+        button.onclick =
+            () => {
+
+                currentPage =
+                    "dashboard";
+
+                render();
+
+            };
+
+
+        document.body.appendChild(
+            button
+        );
+
+    }
+
+
+    function shell(content) {
+
+        let element =
+            document.getElementById(
+                "ac-v4-root"
+            );
+
+
+        if (!element) {
+
+            element =
+                document.createElement(
+                    "section"
+                );
+
+
+            element.id =
+                "ac-v4-root";
+
+
+            element.className =
+                "ac-v4-shell";
+
+
+            root().prepend(
+                element
+            );
+
+        }
+
+
+        element.innerHTML =
+            content;
+
+
+        return element;
+
+    }
+
+
+    function avatar(
+        user,
+        sizeClass = ""
+    ) {
+
+        if (
+            user &&
+            user.avatar_url
+        ) {
+
+            return `
+                <img
+                    class="ac-v41-avatar ${sizeClass}"
+                    src="${esc(user.avatar_url)}"
+                    alt=""
+                    loading="lazy"
+                >
+            `;
+
+        }
+
+
+        const letter =
+            String(
+                user &&
+                (
+                    user.name ||
+                    user.username
+                )
+                ||
+                "?"
+            )
+            .slice(
+                0,
+                1
+            )
+            .toUpperCase();
+
+
+        return `
+            <div
+                class="ac-v41-avatar-placeholder ${sizeClass}">
+                ${esc(letter)}
+            </div>
+        `;
+
+    }
+
+
+    async function loadDashboard() {
+
+        dashboard =
+            await request(
+                "/api/v4/dashboard"
+            );
+
+    }
+
+
+    async function loadPersonnel(
+        search = "",
+        role = "",
+        organization = "",
+        active = ""
+    ) {
+
+        const params =
+            new URLSearchParams();
+
+
+        if (search) {
+            params.set(
+                "search",
+                search
+            );
+        }
+
+
+        if (role) {
+            params.set(
+                "role",
+                role
+            );
+        }
+
+
+        if (organization) {
+            params.set(
+                "organization",
+                organization
+            );
+        }
+
+
+        if (active !== "") {
+            params.set(
+                "active",
+                active
+            );
+        }
+
+
+        personnel =
+            await request(
+                "/api/v4/personnel?" +
+                params.toString()
+            );
+
+    }
+
+
+    async function renderDashboard() {
+
+        try {
+
+            await loadDashboard();
+
+        } catch (error) {
+
+            shell(`
+
+                <div
+                    class="ac-v4-empty">
+
+                    Command Center недоступен:
+                    ${esc(error.message)}
+
+                </div>
+
+            `);
+
+            return;
+
+        }
+
+
+        const d =
+            dashboard;
+
+
+        shell(`
+
+            <div
+                class="ac-v41-topbar">
+
+                <div
+                    class="ac-v41-brand">
+
+                    <div
+                        class="ac-v41-brand-mark">
+
+                        AC
+
+                    </div>
+
+                    <div>
+
+                        <div>
+                            Arizona Civil
+                        </div>
+
+                        <small
+                            class="ac-v41-muted">
+
+                            Command Center 4.1
+
+                        </small>
+
+                    </div>
+
+                </div>
+
+
+                <div
+                    class="ac-v41-profile">
+
+                    ${avatar(d.user)}
+
+                    <div>
+
+                        <strong>
+                            ${esc(
+                                d.user.name ||
+                                d.user.username
+                            )}
+                        </strong>
+
+                        <div
+                            class="ac-v41-online">
+
+                            <i
+                                class="ac-v41-online-dot">
+                            </i>
+
+                            ${esc(
+                                d.user.role
+                            )}
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+
+            <div
+                class="ac-v4-head">
+
+                <div>
+
+                    <h1
+                        class="ac-v4-title">
+
+                        Arizona Civil
+                        <span
+                            style="opacity:.45">
+
+                            4.1
+
+                        </span>
+
+                    </h1>
+
+                    <p
+                        class="ac-v4-subtitle">
+
+                        Центр управления
+                        гражданскими структурами
+
+                    </p>
+
+                </div>
+
+
+                <button
+                    class="ac-v4-btn"
+                    id="ac-v41-refresh">
+
+                    ↻ Обновить
+
+                </button>
+
+            </div>
+
+
+            <div
+                class="ac-v41-kpi">
+
+                <div
+                    class="ac-v41-kpi-item">
+
+                    <span>
+                        Персонал
+                    </span>
+
+                    <strong>
+                        ${esc(
+                            d.users.total
+                        )}
+                    </strong>
+
+                </div>
+
+
+                <div
+                    class="ac-v41-kpi-item">
+
+                    <span>
+                        Активные
+                    </span>
+
+                    <strong>
+                        ${esc(
+                            d.users.active
+                        )}
+                    </strong>
+
+                </div>
+
+
+                <div
+                    class="ac-v41-kpi-item">
+
+                    <span>
+                        Неактивные
+                    </span>
+
+                    <strong>
+                        ${esc(
+                            d.users.inactive
+                        )}
+                    </strong>
+
+                </div>
+
+
+                <div
+                    class="ac-v41-kpi-item">
+
+                    <span>
+                        Уведомления
+                    </span>
+
+                    <strong>
+                        ${esc(
+                            d.notifications.count
+                        )}
+                    </strong>
+
+                </div>
+
+            </div>
+
+
+            <div
+                class="ac-v4-toolbar">
+
+                <button
+                    class="ac-v4-btn primary"
+                    id="ac-v41-personnel">
+
+                    👥 Personnel Center
+
+                </button>
+
+
+                <button
+                    class="ac-v4-btn"
+                    id="ac-v41-activity">
+
+                    📜 Activity
+
+                </button>
+
+
+                <button
+                    class="ac-v4-btn"
+                    id="ac-v41-notifications">
+
+                    🔔 Notifications
+
+                </button>
+
+            </div>
+
+
+            <div
+                class="ac-v41-layout">
+
+                <div
+                    class="ac-v41-card">
+
+                    <div
+                        class="ac-v41-card-title">
+
+                        <h3>
+                            Последние события
+                        </h3>
+
+                        <span
+                            class="ac-v41-muted">
+
+                            LIVE LOG
+
+                        </span>
+
+                    </div>
+
+
+                    <div
+                        class="ac-v4-events">
+
+                        ${
+                            d.events &&
+                            d.events.length
+
+                            ?
+
+                            d.events
+                                .map(
+                                    event => `
+
+                                        <div
+                                            class="ac-v4-event">
+
+                                            <i
+                                                class="ac-v4-event-dot">
+                                            </i>
+
+                                            <div>
+
+                                                <strong>
+                                                    ${esc(
+                                                        event.title
+                                                    )}
+                                                </strong>
+
+                                                <div>
+                                                    ${esc(
+                                                        event.details ||
+                                                        ""
+                                                    )}
+                                                </div>
+
+                                                <small>
+
+                                                    ${esc(
+                                                        event.actor
+                                                    )}
+
+                                                    ·
+
+                                                    ${new Date(
+                                                        event.created_at
+                                                    ).toLocaleString(
+                                                        "ru-RU"
+                                                    )}
+
+                                                </small>
+
+                                            </div>
+
+                                        </div>
+
+                                    `
+                                )
+                                .join("")
+
+                            :
+
+                            `
+                                <div
+                                    class="ac-v41-empty">
+
+                                    Событий пока нет
+
+                                </div>
+                            `
+
+                        }
+
+                    </div>
+
+                </div>
+
+
+                <div
+                    class="ac-v41-card">
+
+                    <div
+                        class="ac-v41-card-title">
+
+                        <h3>
+                            Структуры
+                        </h3>
+
+                    </div>
+
+
+                    <div
+                        class="ac-v4-events">
+
+                        ${
+                            d.organizations &&
+                            d.organizations.length
+
+                            ?
+
+                            d.organizations
+                                .slice(
+                                    0,
+                                    10
+                                )
+                                .map(
+                                    organization => `
+
+                                        <div
+                                            class="ac-v4-event">
+
+                                            <div>
+
+                                                <strong>
+
+                                                    ${esc(
+                                                        organization.organization
+                                                    )}
+
+                                                </strong>
+
+                                                <div>
+
+                                                    ${esc(
+                                                        organization.count
+                                                    )}
+                                                    сотрудников
+
+                                                </div>
+
+                                            </div>
+
+                                        </div>
+
+                                    `
+                                )
+                                .join("")
+
+                            :
+
+                            `
+                                <div
+                                    class="ac-v41-empty">
+
+                                    Структуры не найдены
+
+                                </div>
+                            `
+
+                        }
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        `);
+
+
+        document.getElementById(
+            "ac-v41-refresh"
+        ).onclick =
+            renderDashboard;
+
+
+        document.getElementById(
+            "ac-v41-personnel"
+        ).onclick =
+            () => {
+
+                currentPage =
+                    "personnel";
+
+                render();
+
+            };
+
+
+        document.getElementById(
+            "ac-v41-activity"
+        ).onclick =
+            () => {
+
+                currentPage =
+                    "activity";
+
+                render();
+
+            };
+
+
+        document.getElementById(
+            "ac-v41-notifications"
+        ).onclick =
+            () => {
+
+                currentPage =
+                    "notifications";
+
+                render();
+
+            };
+
+    }
+
+
+    async function renderPersonnel() {
+
+        shell(`
+
+            <div
+                class="ac-v4-head">
+
+                <div>
+
+                    <h1
+                        class="ac-v4-title">
+
+                        Personnel Center
+
+                    </h1>
+
+                    <p
+                        class="ac-v4-subtitle">
+
+                        Единый реестр состава
+
+                    </p>
+
+                </div>
+
+
+                <button
+                    class="ac-v4-btn"
+                    id="ac-v41-back">
+
+                    ← Dashboard
+
+                </button>
+
+            </div>
+
+
+            <div
+                class="ac-v41-filterbar">
+
+                <input
+                    class="ac-v4-input"
+                    id="ac-v41-search"
+                    placeholder="Поиск по имени или логину"
+                >
+
+
+                <select
+                    class="ac-v41-select"
+                    id="ac-v41-role">
+
+                    <option value="">
+                        Все роли
+                    </option>
+
+                </select>
+
+
+                <select
+                    class="ac-v41-select"
+                    id="ac-v41-active">
+
+                    <option value="">
+                        Любой статус
+                    </option>
+
+                    <option value="true">
+                        Активные
+                    </option>
+
+                    <option value="false">
+                        Неактивные
+                    </option>
+
+                </select>
+
+
+                <button
+                    class="ac-v4-btn primary"
+                    id="ac-v41-search-btn">
+
+                    Найти
+
+                </button>
+
+            </div>
+
+
+            <div
+                id="ac-v41-personnel-table"
+                class="ac-v4-table-wrap">
+
+                <div
+                    class="ac-v41-empty">
+
+                    Загрузка...
+
+                </div>
+
+            </div>
+
+        `);
+
+
+        document.getElementById(
+            "ac-v41-back"
+        ).onclick =
+            () => {
+
+                currentPage =
+                    "dashboard";
+
+                render();
+
+            };
+
+
+        const search =
+            document.getElementById(
+                "ac-v41-search"
+            );
+
+
+        const role =
+            document.getElementById(
+                "ac-v41-role"
+            );
+
+
+        const active =
+            document.getElementById(
+                "ac-v41-active"
+            );
+
+
+        try {
+
+            const roles =
+                await request(
+                    "/api/v4/roles"
+                );
+
+
+            role.innerHTML =
+                `
+                    <option value="">
+                        Все роли
+                    </option>
+                ` +
+
+                roles
+                    .map(
+                        r => `
+
+                            <option
+                                value="${esc(r.name)}">
+
+                                ${esc(r.name)}
+
+                            </option>
+
+                        `
+                    )
+                    .join("");
+
+        } catch {
+        }
+
+
+        document.getElementById(
+            "ac-v41-search-btn"
+        ).onclick =
+            () =>
+                renderPersonnelData(
+                    search.value.trim(),
+                    role.value,
+                    active.value
+                );
+
+
+        search.addEventListener(
+            "keydown",
+            event => {
+
+                if (
+                    event.key ===
+                    "Enter"
+                ) {
+
+                    renderPersonnelData(
+                        search.value.trim(),
+                        role.value,
+                        active.value
+                    );
+
+                }
+
+            }
+        );
+
+
+        await renderPersonnelData(
+            "",
+            "",
+            ""
+        );
+
+    }
+
+
+    async function renderPersonnelData(
+        search,
+        role,
+        active
+    ) {
+
+        const box =
+            document.getElementById(
+                "ac-v41-personnel-table"
+            );
+
+
+        if (!box) {
+            return;
+        }
+
+
+        box.innerHTML =
+            `
+                <div
+                    class="ac-v41-empty">
+
+                    Загрузка...
+
+                </div>
+            `;
+
+
+        try {
+
+            await loadPersonnel(
+                search,
+                role,
+                "",
+                active
+            );
+
+
+            currentPersonnelSearch =
+                search;
+
+
+            if (
+                !personnel.length
+            ) {
+
+                box.innerHTML =
+                    `
+                        <div
+                            class="ac-v41-empty">
+
+                            Сотрудники не найдены
+
+                        </div>
+                    `;
+
+                return;
+
+            }
+
+
+            box.innerHTML = `
+
+                <table
+                    class="ac-v4-table">
+
+                    <thead>
+
+                        <tr>
+
+                            <th>
+                                Сотрудник
+                            </th>
+
+                            <th>
+                                Роль
+                            </th>
+
+                            <th>
+                                Должность
+                            </th>
+
+                            <th>
+                                Структура
+                            </th>
+
+                            <th>
+                                Статус
+                            </th>
+
+                            <th>
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody>
+
+                        ${
+                            personnel
+                                .map(
+                                    user => `
+
+                                        <tr>
+
+                                            <td>
+
+                                                <div
+                                                    class="ac-v41-user">
+
+                                                    ${avatar(
+                                                        user,
+                                                        "ac-v41-user-avatar"
+                                                    )}
+
+                                                    <div>
+
+                                                        <div
+                                                            class="ac-v41-user-name">
+
+                                                            ${esc(
+                                                                user.name ||
+                                                                user.username
+                                                            )}
+
+                                                        </div>
+
+                                                        <div
+                                                            class="ac-v41-user-login">
+
+                                                            @${esc(
+                                                                user.username
+                                                            )}
+
+                                                        </div>
+
+                                                    </div>
+
+                                                </div>
+
+                                            </td>
+
+
+                                            <td>
+
+                                                <span
+                                                    class="ac-v41-role">
+
+                                                    ${esc(
+                                                        user.role
+                                                    )}
+
+                                                </span>
+
+                                            </td>
+
+
+                                            <td>
+
+                                                ${esc(
+                                                    user.position ||
+                                                    "—"
+                                                )}
+
+                                            </td>
+
+
+                                            <td>
+
+                                                ${esc(
+                                                    user.organization ||
+                                                    "—"
+                                                )}
+
+                                            </td>
+
+
+                                            <td>
+
+                                                ${
+                                                    user.active
+
+                                                    ?
+
+                                                    "● Активен"
+
+                                                    :
+
+                                                    "○ Неактивен"
+
+                                                }
+
+                                            </td>
+
+
+                                            <td>
+
+                                                <button
+                                                    class="ac-v4-btn"
+                                                    data-v41-user="${user.id}">
+
+                                                    Профиль
+
+                                                </button>
+
+                                            </td>
+
+                                        </tr>
+
+                                    `
+                                )
+                                .join("")
+                        }
+
+                    </tbody>
+
+                </table>
+
+            `;
+
+
+            box
+                .querySelectorAll(
+                    "[data-v41-user]"
+                )
+                .forEach(
+                    button => {
+
+                        button.onclick =
+                            () =>
+                                renderProfile(
+                                    Number(
+                                        button.dataset.v41User
+                                    )
+                                );
+
+                    }
+                );
+
+        } catch (error) {
+
+            box.innerHTML =
+                `
+                    <div
+                        class="ac-v41-empty">
+
+                        ${esc(
+                            error.message
+                        )}
+
+                    </div>
+                `;
+
+        }
+
+    }
+
+
+    async function renderProfile(
+        id
+    ) {
+
+        try {
+
+            const data =
+                await request(
+                    "/api/v4/personnel/" +
+                    id
+                );
+
+
+            const user =
+                data.user;
+
+
+            shell(`
+
+                <div
+                    class="ac-v4-head">
+
+                    <div
+                        class="ac-v41-user">
+
+                        ${avatar(
+                            user,
+                            "ac-v41-user-avatar"
+                        )}
+
+                        <div>
+
+                            <h1
+                                class="ac-v4-title">
+
+                                ${esc(
+                                    user.name ||
+                                    user.username
+                                )}
+
+                            </h1>
+
+                            <p
+                                class="ac-v4-subtitle">
+
+                                ${esc(
+                                    user.role
+                                )}
+
+                                ·
+
+                                ${esc(
+                                    user.position ||
+                                    "Без должности"
+                                )}
+
+                            </p>
+
+                        </div>
+
+                    </div>
+
+
+                    <button
+                        class="ac-v4-btn"
+                        id="ac-v41-profile-back">
+
+                        ← Personnel
+
+                    </button>
+
+                </div>
+
+
+                <div
+                    class="ac-v41-kpi">
+
+                    <div
+                        class="ac-v41-kpi-item">
+
+                        <span>
+                            Логин
+                        </span>
+
+                        <strong
+                            style="font-size:17px">
+
+                            ${esc(
+                                user.username
+                            )}
+
+                        </strong>
+
+                    </div>
+
+
+                    <div
+                        class="ac-v41-kpi-item">
+
+                        <span>
+                            Роль
+                        </span>
+
+                        <strong
+                            style="font-size:17px">
+
+                            ${esc(
+                                user.role
+                            )}
+
+                        </strong>
+
+                    </div>
+
+
+                    <div
+                        class="ac-v41-kpi-item">
+
+                        <span>
+                            Структура
+                        </span>
+
+                        <strong
+                            style="font-size:17px">
+
+                            ${esc(
+                                user.organization ||
+                                "—"
+                            )}
+
+                        </strong>
+
+                    </div>
+
+
+                    <div
+                        class="ac-v41-kpi-item">
+
+                        <span>
+                            VK
+                        </span>
+
+                        <strong
+                            style="font-size:17px">
+
+                            ${esc(
+                                user.vk ||
+                                "—"
+                            )}
+
+                        </strong>
+
+                    </div>
+
+                </div>
+
+
+                <div
+                    class="ac-v41-card"
+                    style="margin-top:16px">
+
+                    <div
+                        class="ac-v41-card-title">
+
+                        <h3>
+                            Информация
+                        </h3>
+
+                    </div>
+
+
+                    <div
+                        class="ac-v4-events">
+
+                        <div
+                            class="ac-v4-event">
+
+                            <div>
+
+                                <strong>
+                                    Статус
+                                </strong>
+
+                                <div>
+                                    ${
+                                        user.active
+                                        ?
+                                        "Активен"
+                                        :
+                                        "Неактивен"
+                                    }
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+                        <div
+                            class="ac-v4-event">
+
+                            <div>
+
+                                <strong>
+                                    Назначен
+                                </strong>
+
+                                <div>
+                                    ${user.appointed_at
+                                        ?
+                                        new Date(
+                                            user.appointed_at
+                                        ).toLocaleString(
+                                            "ru-RU"
+                                        )
+                                        :
+                                        "—"
+                                    }
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+                        <div
+                            class="ac-v4-event">
+
+                            <div>
+
+                                <strong>
+                                    Назначил
+                                </strong>
+
+                                <div>
+                                    ${esc(
+                                        user.appointed_by ||
+                                        "—"
+                                    )}
+                                </div>
+
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div
+                    class="ac-v41-card"
+                    style="margin-top:16px">
+
+                    <div
+                        class="ac-v41-card-title">
+
+                        <h3>
+                            История
+                        </h3>
+
+                    </div>
+
+
+                    <div
+                        class="ac-v4-events">
+
+                        ${
+                            data.history &&
+                            data.history.length
+
+                            ?
+
+                            data.history
+                                .map(
+                                    history => `
+
+                                        <div
+                                            class="ac-v4-event">
+
+                                            <i
+                                                class="ac-v4-event-dot">
+                                            </i>
+
+                                            <div>
+
+                                                <strong>
+                                                    ${esc(
+                                                        history.action
+                                                    )}
+                                                </strong>
+
+                                                <div>
+                                                    ${esc(
+                                                        history.details ||
+                                                        ""
+                                                    )}
+                                                </div>
+
+                                                <small>
+
+                                                    ${esc(
+                                                        history.actor ||
+                                                        "system"
+                                                    )}
+
+                                                    ·
+
+                                                    ${new Date(
+                                                        history.created_at
+                                                    ).toLocaleString(
+                                                        "ru-RU"
+                                                    )}
+
+                                                </small>
+
+                                            </div>
+
+                                        </div>
+
+                                    `
+                                )
+                                .join("")
+
+                            :
+
+                            `
+                                <div
+                                    class="ac-v41-empty">
+
+                                    История пуста
+
+                                </div>
+                            `
+
+                        }
+
+                    </div>
+
+                </div>
+
+
+                <div
+                    class="ac-v41-card"
+                    style="margin-top:16px">
+
+                    <div
+                        class="ac-v41-card-title">
+
+                        <h3>
+                            Заметки
+                        </h3>
+
+                    </div>
+
+
+                    <div
+                        class="ac-v4-toolbar">
+
+                        <input
+                            class="ac-v4-input"
+                            id="ac-v41-note"
+                            style="flex:1"
+                            placeholder="Добавить заметку"
+                        >
+
+
+                        <button
+                            class="ac-v4-btn primary"
+                            id="ac-v41-add-note">
+
+                            Добавить
+
+                        </button>
+
+                    </div>
+
+
+                    <div
+                        class="ac-v4-events">
+
+                        ${
+                            data.notes &&
+                            data.notes.length
+
+                            ?
+
+                            data.notes
+                                .map(
+                                    note => `
+
+                                        <div
+                                            class="ac-v4-event">
+
+                                            <div>
+
+                                                <strong>
+                                                    ${esc(
+                                                        note.author
+                                                    )}
+                                                </strong>
+
+                                                <div>
+                                                    ${esc(
+                                                        note.note
+                                                    )}
+                                                </div>
+
+                                                <small>
+
+                                                    ${new Date(
+                                                        note.created_at
+                                                    ).toLocaleString(
+                                                        "ru-RU"
+                                                    )}
+
+                                                </small>
+
+                                            </div>
+
+                                        </div>
+
+                                    `
+                                )
+                                .join("")
+
+                            :
+
+                            `
+                                <div
+                                    class="ac-v41-empty">
+
+                                    Заметок нет
+
+                                </div>
+                            `
+
+                        }
+
+                    </div>
+
+                </div>
+
+            `);
+
+
+            document.getElementById(
+                "ac-v41-profile-back"
+            ).onclick =
+                () => {
+
+                    currentPage =
+                        "personnel";
+
+                    render();
+
+                };
+
+
+            document.getElementById(
+                "ac-v41-add-note"
+            ).onclick =
+                async () => {
+
+                    const input =
+                        document.getElementById(
+                            "ac-v41-note"
+                        );
+
+
+                    const note =
+                        input.value.trim();
+
+
+                    if (!note) {
+                        return;
+                    }
+
+
+                    try {
+
+                        await request(
+                            "/api/v4/personnel/" +
+                            id +
+                            "/notes",
+                            {
+
+                                method:
+                                    "POST",
+
+                                headers: {
+
+                                    "Content-Type":
+                                        "application/json"
+
+                                },
+
+                                body:
+                                    JSON.stringify({
+                                        note
+                                    })
+
+                            }
+                        );
+
+
+                        renderProfile(
+                            id
+                        );
+
+                    } catch (error) {
+
+                        alert(
+                            error.message
+                        );
+
+                    }
+
+                };
+
+        } catch (error) {
+
+            shell(
+                `
+                    <div
+                        class="ac-v41-empty">
+
+                        ${esc(
+                            error.message
+                        )}
+
+                    </div>
+                `
+            );
+
+        }
+
+    }
+
+
+    async function renderActivity() {
+
+        try {
+
+            const rows =
+                await request(
+                    "/api/v4/activity"
+                );
+
+
+            shell(`
+
+                <div
+                    class="ac-v4-head">
+
+                    <div>
+
+                        <h1
+                            class="ac-v4-title">
+
+                            Журнал активности
+
+                        </h1>
+
+                        <p
+                            class="ac-v4-subtitle">
+
+                            Последние системные события
+
+                        </p>
+
+                    </div>
+
+
+                    <button
+                        class="ac-v4-btn"
+                        id="ac-v41-back">
+
+                        ← Dashboard
+
+                    </button>
+
+                </div>
+
+
+                <div
+                    class="ac-v41-card">
+
+                    <div
+                        class="ac-v4-events">
+
+                        ${
+                            rows &&
+                            rows.length
+
+                            ?
+
+                            rows
+                                .map(
+                                    event => `
+
+                                        <div
+                                            class="ac-v4-event">
+
+                                            <i
+                                                class="ac-v4-event-dot">
+                                            </i>
+
+                                            <div>
+
+                                                <strong>
+                                                    ${esc(
+                                                        event.title
+                                                    )}
+                                                </strong>
+
+                                                <div>
+                                                    ${esc(
+                                                        event.details ||
+                                                        ""
+                                                    )}
+                                                </div>
+
+                                                <small>
+
+                                                    ${esc(
+                                                        event.actor
+                                                    )}
+
+                                                    ·
+
+                                                    ${new Date(
+                                                        event.created_at
+                                                    ).toLocaleString(
+                                                        "ru-RU"
+                                                    )}
+
+                                                </small>
+
+                                            </div>
+
+                                        </div>
+
+                                    `
+                                )
+                                .join("")
+
+                            :
+
+                            `
+                                <div
+                                    class="ac-v41-empty">
+
+                                    Журнал пуст
+
+                                </div>
+                            `
+
+                        }
+
+                    </div>
+
+                </div>
+
+            `);
+
+
+            document.getElementById(
+                "ac-v41-back"
+            ).onclick =
+                () => {
+
+                    currentPage =
+                        "dashboard";
+
+                    render();
+
+                };
+
+        } catch (error) {
+
+            shell(
+                `
+                    <div
+                        class="ac-v41-empty">
+
+                        ${esc(
+                            error.message
+                        )}
+
+                    </div>
+                `
+            );
+
+        }
+
+    }
+
+
+    async function renderNotifications() {
+
+        try {
+
+            const rows =
+                await request(
+                    "/api/v4/notifications"
+                );
+
+
+            shell(`
+
+                <div
+                    class="ac-v4-head">
+
+                    <div>
+
+                        <h1
+                            class="ac-v4-title">
+
+                            Уведомления
+
+                        </h1>
+
+                        <p
+                            class="ac-v4-subtitle">
+
+                            Системные события аккаунта
+
+                        </p>
+
+                    </div>
+
+
+                    <button
+                        class="ac-v4-btn"
+                        id="ac-v41-back">
+
+                        ← Dashboard
+
+                    </button>
+
+                </div>
+
+
+                <div
+                    class="ac-v4-events">
+
+                    ${
+                        rows &&
+                        rows.length
+
+                        ?
+
+                        rows
+                            .map(
+                                notification => `
+
+                                    <div
+                                        class="ac-v4-event ${
+                                            notification.read
+                                            ?
+                                            "ac-v41-notification-read"
+                                            :
+                                            "ac-v41-notification-unread"
+                                        }">
+
+                                        <i
+                                            class="ac-v4-event-dot">
+                                        </i>
+
+                                        <div
+                                            style="flex:1">
+
+                                            <strong>
+                                                ${esc(
+                                                    notification.title
+                                                )}
+                                            </strong>
+
+                                            <div>
+                                                ${esc(
+                                                    notification.message
+                                                )}
+                                            </div>
+
+                                            <small>
+
+                                                ${new Date(
+                                                    notification.created_at
+                                                ).toLocaleString(
+                                                    "ru-RU"
+                                                )}
+
+                                                ·
+
+                                                ${
+                                                    notification.read
+                                                    ?
+                                                    "прочитано"
+                                                    :
+                                                    "новое"
+                                                }
+
+                                            </small>
+
+                                        </div>
+
+
+                                        ${
+                                            notification.read
+
+                                            ?
+
+                                            ""
+
+                                            :
+
+                                            `
+
+                                                <button
+                                                    class="ac-v4-btn"
+                                                    data-v41-read="${
+                                                        notification.id
+                                                    }">
+
+                                                    Прочитано
+
+                                                </button>
+
+                                            `
+                                        }
+
+                                    </div>
+
+                                `
+                            )
+                            .join("")
+
+                        :
+
+                        `
+                            <div
+                                class="ac-v41-empty">
+
+                                Уведомлений нет
+
+                            </div>
+                        `
+
+                    }
+
+                </div>
+
+            `);
+
+
+            document.getElementById(
+                "ac-v41-back"
+            ).onclick =
+                () => {
+
+                    currentPage =
+                        "dashboard";
+
+                    render();
+
+                };
+
+
+            document
+                .querySelectorAll(
+                    "[data-v41-read]"
+                )
+                .forEach(
+                    button => {
+
+                        button.onclick =
+                            async () => {
+
+                                try {
+
+                                    await request(
+                                        "/api/v4/notifications/" +
+                                        button.dataset.v41Read +
+                                        "/read",
+                                        {
+                                            method:
+                                                "PATCH"
+                                        }
+                                    );
+
+
+                                    renderNotifications();
+
+                                } catch (error) {
+
+                                    alert(
+                                        error.message
+                                    );
+
+                                }
+
+                            };
+
+                    }
+                );
+
+        } catch (error) {
+
+            shell(
+                `
+                    <div
+                        class="ac-v41-empty">
+
+                        ${esc(
+                            error.message
+                        )}
+
+                    </div>
+                `
+            );
+
+        }
+
+    }
+
+
+    async function render() {
+
+        if (
+            currentPage ===
+            "personnel"
+        ) {
+
+            return renderPersonnel();
+
+        }
+
+
+        if (
+            currentPage ===
+            "activity"
+        ) {
+
+            return renderActivity();
+
+        }
+
+
+        if (
+            currentPage ===
+            "notifications"
+        ) {
+
+            return renderNotifications();
+
+        }
+
+
+        return renderDashboard();
+
+    }
+
+
+    function boot() {
+
+        ensureButton();
+
+    }
+
+
+    if (
+        document.readyState ===
+        "loading"
+    ) {
+
+        document.addEventListener(
+            "DOMContentLoaded",
+            boot,
+            {
+                once:
+                    true
+            }
+        );
+
+    } else {
+
+        boot();
+
+    }
+
+})();
+
+

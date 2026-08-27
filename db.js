@@ -473,3 +473,216 @@ async function initDatabaseV30() {
     console.log("✅ Arizona Civil 3.0 DB готова");
 }
 
+
+
+/*
+=========================================================
+ ARIZONA_CIVIL_4_1_DATABASE
+ Без удаления существующих данных
+=========================================================
+*/
+
+async function initDatabaseV41() {
+
+    await query(`
+        CREATE TABLE IF NOT EXISTS activity_events (
+            id BIGSERIAL PRIMARY KEY,
+
+            actor VARCHAR(100) NOT NULL,
+
+            event_type VARCHAR(100) NOT NULL,
+
+            title VARCHAR(200) NOT NULL,
+
+            details TEXT DEFAULT '',
+
+            target_user_id BIGINT
+                REFERENCES users(id)
+                ON DELETE SET NULL,
+
+            organization VARCHAR(200)
+                DEFAULT '',
+
+            created_at TIMESTAMPTZ
+                NOT NULL DEFAULT NOW()
+        )
+    `);
+
+    await query(`
+        CREATE INDEX IF NOT EXISTS
+        idx_activity_events_created_v41
+        ON activity_events(created_at DESC)
+    `);
+
+    await query(`
+        CREATE INDEX IF NOT EXISTS
+        idx_activity_events_actor_v41
+        ON activity_events(actor)
+    `);
+
+
+    await query(`
+        CREATE TABLE IF NOT EXISTS personnel_notes_v4 (
+            id BIGSERIAL PRIMARY KEY,
+
+            user_id BIGINT
+                REFERENCES users(id)
+                ON DELETE CASCADE,
+
+            author VARCHAR(100) NOT NULL,
+
+            note TEXT NOT NULL,
+
+            created_at TIMESTAMPTZ
+                NOT NULL DEFAULT NOW()
+        )
+    `);
+
+    await query(`
+        CREATE INDEX IF NOT EXISTS
+        idx_personnel_notes_v4_user_v41
+        ON personnel_notes_v4(user_id)
+    `);
+
+
+    await query(`
+        CREATE TABLE IF NOT EXISTS notifications (
+            id BIGSERIAL PRIMARY KEY,
+
+            user_id BIGINT
+                REFERENCES users(id)
+                ON DELETE CASCADE,
+
+            title VARCHAR(200) NOT NULL,
+
+            message TEXT DEFAULT '',
+
+            type VARCHAR(50)
+                NOT NULL DEFAULT 'info',
+
+            read BOOLEAN
+                NOT NULL DEFAULT FALSE,
+
+            created_at TIMESTAMPTZ
+                NOT NULL DEFAULT NOW()
+        )
+    `);
+
+    await query(`
+        CREATE INDEX IF NOT EXISTS
+        idx_notifications_user_read_v41
+        ON notifications(
+            user_id,
+            read,
+            created_at DESC
+        )
+    `);
+
+
+    await query(`
+        CREATE TABLE IF NOT EXISTS system_settings (
+            key VARCHAR(100) PRIMARY KEY,
+
+            value TEXT
+                NOT NULL DEFAULT '',
+
+            updated_by VARCHAR(100),
+
+            updated_at TIMESTAMPTZ
+                NOT NULL DEFAULT NOW()
+        )
+    `);
+
+
+    await query(`
+        CREATE TABLE IF NOT EXISTS organization_members (
+            id BIGSERIAL PRIMARY KEY,
+
+            user_id BIGINT
+                REFERENCES users(id)
+                ON DELETE CASCADE,
+
+            organization VARCHAR(200)
+                NOT NULL,
+
+            role VARCHAR(100)
+                NOT NULL,
+
+            position VARCHAR(200)
+                DEFAULT '',
+
+            active BOOLEAN
+                NOT NULL DEFAULT TRUE,
+
+            appointed_by VARCHAR(100),
+
+            created_at TIMESTAMPTZ
+                NOT NULL DEFAULT NOW()
+        )
+    `);
+
+    await query(`
+        CREATE INDEX IF NOT EXISTS
+        idx_org_members_org_v41
+        ON organization_members(organization)
+    `);
+
+    await query(`
+        CREATE INDEX IF NOT EXISTS
+        idx_org_members_user_v41
+        ON organization_members(user_id)
+    `);
+
+    await query(`
+        CREATE INDEX IF NOT EXISTS
+        idx_org_members_active_v41
+        ON organization_members(active)
+    `);
+
+
+    /*
+    =====================================================
+     V4.1 SYSTEM SETTINGS
+    =====================================================
+    */
+
+    await query(`
+        INSERT INTO system_settings
+            (key, value, updated_by)
+        VALUES
+            (
+                'application_version',
+                '4.1.0',
+                'system'
+            )
+        ON CONFLICT (key)
+        DO UPDATE SET
+            value = EXCLUDED.value,
+            updated_at = NOW()
+    `);
+
+
+    await query(`
+        INSERT INTO system_settings
+            (key, value, updated_by)
+        VALUES
+            (
+                'application_codename',
+                'Command Center',
+                'system'
+            )
+        ON CONFLICT (key)
+        DO NOTHING
+    `);
+
+
+    console.log(
+        "✅ Arizona Civil 4.1: PostgreSQL migration готова"
+    );
+}
+
+
+module.exports.initDatabaseV41 =
+    initDatabaseV41;
+
+

@@ -1,0 +1,105 @@
+{
+  "users": [
+    {
+      "id": 1787677530249,
+      "username": "admin",
+      "password": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+      "role": "Разработчик"
+    },
+    {
+      "id": 1787685429840,
+      "username": "testuser",
+      "password": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+      "role": "Пользователь"
+    },
+    {
+      "id": 1787685459600,
+      "username": "testadmin",
+      "password": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+      "role": "Пользователь"
+    },
+    {
+      "id": 1787685756245,
+      "username": "testuser2",
+      "password": "8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92",
+      "role": "Пользователь"
+    }
+  ],
+  "leaders": [],
+  "deputies": [
+    {
+      "id": 1787727203925,
+      "structure": "Правительство",
+      "deputy": "Alan_Williams",
+      "vk": "https://vk.ru/elincion",
+      "created_at": "2026-08-26T06:53:23.925Z"
+    }
+  ],
+  "penalties": [],
+  "supervisors": [],
+  "journal": [
+    {
+      "id": 1787727203925,
+      "date": "2026-08-26T06:53:23.925Z",
+      "actor": "admin",
+      "action": "Добавлен заместитель",
+      "details": "Правительство: Alan_Williams"
+    },
+    {
+      "id": 1787721084511,
+      "date": "2026-08-26T05:11:24.511Z",
+      "actor": "admin",
+      "action": "Удаление следящего",
+      "details": "Alan_Williams"
+    },
+    {
+      "id": 1787685781510,
+      "date": "2026-08-25T19:23:01.510Z",
+      "actor": "testuser2",
+      "action": "Авторизация",
+      "details": "Вход в систему как Пользователь"
+    },
+    {
+      "id": 1787685756246,
+      "date": "2026-08-25T19:22:36.246Z",
+      "actor": "testuser2",
+      "action": "Регистрация",
+      "details": "Создан аккаунт с ролью Пользователь"
+    },
+    {
+      "id": 1787685459600,
+      "date": "2026-08-25T19:17:39.600Z",
+      "actor": "testadmin",
+      "action": "Регистрация",
+      "details": "Создан аккаунт с ролью Пользователь"
+    },
+    {
+      "id": 1787685429840,
+      "date": "2026-08-25T19:17:09.840Z",
+      "actor": "testuser",
+      "action": "Регистрация",
+      "details": "Создан аккаунт с ролью Пользователь"
+    },
+    {
+      "id": 1787679600888,
+      "date": "2026-08-25T17:40:00.888Z",
+      "actor": "admin",
+      "action": "Добавлен следящий",
+      "details": "Alan_Williams: Следящий за Правительством"
+    },
+    {
+      "id": 1787679574110,
+      "date": "2026-08-25T17:39:34.110Z",
+      "actor": "admin",
+      "action": "Авторизация",
+      "details": "Вход в систему как Разработчик"
+    },
+    {
+      "id": 1787679280113,
+      "date": "2026-08-25T17:34:40.113Z",
+      "actor": "admin",
+      "action": "Авторизация",
+      "details": "Вход в систему как Разработчик"
+    }
+  ]
+}

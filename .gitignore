@@ -9,3 +9,5 @@ node_modules/
 
 arizona-data.json
 .DS_Store
+backup-before-4.0-*
+backup-before-4.1-*
